@@ -2,70 +2,112 @@
 
 namespace AnalizadorLexico
 {
-    public abstract class Recorrido
+    public class Recorrido
     {
         // Cadena de conexión
         protected string connectionString = "Server=EVA;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
+        private static readonly Dictionary<char, string> simbolos = new()
+        {
+            {'>', "MAYOR"},
+            {'<', "MENOR"},
+            {'=', "IGUAL"},
+            {'*', "ASTERISCO"},
+            {'/', "SLASH"},
+            {'+', "MAS"},
+            {'-', "MENOS"},
+            {'{', "LLAVE_ABRE"},
+            {'}', "LLAVE_CIERRA"},
+            {'#', "NUMERAL"},
+            {'"', "COMILLA_DOBLE"},
+            {'(', "PAR_ABRE"},
+            {')', "PAR_CIERRA"},
+            {';', "PUNTO_COMA"},
+            {',', "COMA"},
+            {':', "DOS_PUNTOS"},
+            {'!', "ADMIRACION"},
+            {'@', "ARROBA"},
+            {'$', "DOLAR"},
+            {'%', "PORCENTAJE"},
+            {'^', "CIRCUNFLEJO"},
+            {'&', "AMPERSAND"},
+            {'?', "INTERROGACION"},
+            {'.', "PUNTO"},
+            {'\'', "COMILLA_SIMPLE"},
+            {'[', "CORCHETE_ABRE"},
+            {']', "CORCHETE_CIERRA"},
+            {'~', "VIRGULILLA"},
+            {'\\', "BACKSLASH"}
+        };
+
         private Dictionary<(int estado, string columna), int> _tabla = new();
+        private Dictionary<int, string> _categoriaAceptacion = new();
+        private HashSet<int> _estadosFinalCadena = new();
         private bool TablaCargada = false;
-        public abstract bool Aceptacion(int estado);
-        public abstract string NombreTabla { get; }
-        public abstract string ObtenerColumna(char caracter);
-        public abstract string ObtenerMensajeError(int estado, char? caracter);
-        public abstract bool EstadoError(int estado);
-        public abstract int ObtenerEstadoError();
+
         private void CargarTabla()
         {
             if (TablaCargada) return;
 
             using (SqlConnection conn = new SqlConnection(connectionString))
             {
-                try
+                conn.Open();
+
+                string query = "SELECT * FROM AnalizadorLexico";
+                SqlCommand cmd = new SqlCommand(query, conn);
+                SqlDataReader reader = cmd.ExecuteReader();
+
+                var columnas = Enumerable.Range(0, reader.FieldCount)
+                                         .Select(reader.GetName)
+                                         .ToList();
+
+                var columnasIgnorar = new HashSet<string> { "ESTADO", "CAT", "FDC" };
+
+                while (reader.Read())
                 {
-                    conn.Open();
-                    string query = $"SELECT * FROM {NombreTabla}";
-                    SqlCommand cmd = new SqlCommand(query, conn);
-                    SqlDataReader reader = cmd.ExecuteReader();
+                    int estado = Convert.ToInt32(reader["ESTADO"]);
 
-                    var columnas = new List<string>();
-                    for (int i = 0; i < reader.FieldCount; i++)
-                        columnas.Add(reader.GetName(i));
-
-                    while (reader.Read())
+                    foreach (var col in columnas)
                     {
-                        int estado = Convert.ToInt32(reader["Estado"]);
-                        foreach (var col in columnas)
+                        if (col == "CAT")
                         {
-                            if (col == "Estado") continue;
-                            var val = reader[col];
-                            if (val == null || val == DBNull.Value)
-                                continue;
-
-                            string valStr = val?.ToString()?.Trim() ?? string.Empty;
-                            if (!string.IsNullOrEmpty(valStr))
-                                _tabla[(estado, col)] = Convert.ToInt32(valStr);
+                            string? cat = reader[col]?.ToString()?.Trim();
+                            if (!string.IsNullOrEmpty(cat))
+                                _categoriaAceptacion[estado] = cat;
+                            continue;
                         }
+
+                        if (col == "FDC")
+                        {
+                            string? fdcVal = reader[col]?.ToString()?.Trim();
+
+                            if (!string.IsNullOrEmpty(fdcVal) && fdcVal != "-")
+                            {
+                                if (fdcVal == "1")
+                                {
+                                    _estadosFinalCadena.Add(estado);
+                                }
+                                else if (int.TryParse(fdcVal, out int estadoDestino))
+                                {
+                                    _estadosFinalCadena.Add(estado);
+                                    _tabla[(estado, "FDC")] = estadoDestino; 
+                                }
+                            }
+                            continue;
+                        }
+
+                        if (columnasIgnorar.Contains(col))
+                            continue;
+
+                        string? val = reader[col]?.ToString()?.Trim();
+                        if (!string.IsNullOrEmpty(val) && val != "-")
+                            _tabla[(estado, col)] = Convert.ToInt32(val);
                     }
-                    TablaCargada = true;
                 }
-                catch (SqlException ex)
-                {
-                    MessageBox.Show($"Error al conectar con la base de datos:\n{ex.Message}",
-                                    "Error de conexión",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Error);
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show($"Error inesperado al cargar la tabla:\n{ex.Message}",
-                                    "Error",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Error);
-                }
+                TablaCargada = true;
             }
         }
-        public (bool esValido, string mensajeError, string recorrido) RecorrerCadena(string cadena)
+        public (bool esValido, string token, string recorrido) RecorrerCadena(string cadena)
         {
             CargarTabla();
             int estado = 0;
@@ -76,34 +118,57 @@ namespace AnalizadorLexico
                 char caracter = cadena[x];
                 int siguienteEstado = Validar(estado, caracter);
 
+                if (siguienteEstado == -1)
+                {
+                    recorrido += $" {caracter} -> (ERROR)";
+                    return (false, $"Error: carácter no válido '{caracter}' en posición {x}", recorrido);
+                }
+
                 recorrido += $" {caracter} -> ({siguienteEstado})";
-
-                if (EstadoError(siguienteEstado))
-                    return (false, ObtenerMensajeError(estado, caracter), recorrido);
-
                 estado = siguienteEstado;
             }
 
-            if (_tabla.TryGetValue((estado, "FDC"), out int estadoFinal))
+            if (_estadosFinalCadena.Contains(estado))
             {
-                recorrido += $" FDC -> ({estadoFinal})";
 
-                if (Aceptacion(estadoFinal))
-                    return (true, "", recorrido);
-                else
-                    return (false, ObtenerMensajeError(estadoFinal, null), recorrido);
+                if (_tabla.TryGetValue((estado, "FDC"), out int estadoFinal))
+                {
+                    recorrido += $" ⊣ -> ({estadoFinal})";
+                    estado = estadoFinal;
+                }
             }
 
-            return (false, ObtenerMensajeError(estado, null), recorrido);
+            if (_categoriaAceptacion.TryGetValue(estado, out string? token))
+            {
+                return (true, token, recorrido);
+            }
+
+            return (false, "Cadena no aceptada (estado final sin categoría).", recorrido);
         }
         public int Validar(int estado, char caracter)
         {
-            string columna = ObtenerColumna(caracter);
+            string? columna = ObtenerColumna(caracter);
+
+            if (columna == null)
+                return -1;
 
             if (_tabla.TryGetValue((estado, columna), out int siguiente))
                 return siguiente;
 
-            return ObtenerEstadoError();
+            return -1;
+        }
+        public string? ObtenerColumna(char c)
+        {
+            if (char.IsLetter(c))
+                return char.ToUpper(c).ToString(); 
+
+            if (char.IsDigit(c))
+                return c.ToString(); 
+
+            if (simbolos.TryGetValue(c, out string? columna))
+                return columna;
+
+            return null;
         }
     }
 }

@@ -2,7 +2,7 @@ namespace AnalizadorLexico
 {
     public partial class Form1 : Form
     {
-        private IdentificadorValido IDV = new();
+        private Recorrido r = new();
         public Form1()
         {
             InitializeComponent();
@@ -11,13 +11,14 @@ namespace AnalizadorLexico
         {
             string cadena = txtCadena.Text.Trim();
 
-            var (valido, mensaje, recorrido) = IDV.RecorrerCadena(cadena);
+            var (valido, resultado, recorrido) = r.RecorrerCadena(cadena);
 
             if (valido)
             {
-                txtToken.Text = "IDV";
+                txtToken.Text = resultado;
                 txtValor.Text = cadena;
-                MessageBox.Show($"{cadena}: {recorrido} TOKEN: IDV",
+
+                MessageBox.Show($"{cadena}: {recorrido}\nTOKEN: {resultado}",
                                 "Recorrido",
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Information);
@@ -26,7 +27,8 @@ namespace AnalizadorLexico
             {
                 txtToken.Text = "ERROR";
                 txtValor.Text = "";
-                MessageBox.Show($"{cadena}: {recorrido}\n\n{mensaje}",
+
+                MessageBox.Show($"{cadena}: {recorrido}\n\n{resultado}",
                                 "Error",
                                 MessageBoxButtons.OK,
                                 MessageBoxIcon.Error);
