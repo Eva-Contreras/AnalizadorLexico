@@ -151,7 +151,7 @@
             Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
-            Text = "CÇ - Comme ci, comme ça";
+            Text = "CÇ - Comme ci, comme ça (Beta)";
             groupBox1.ResumeLayout(false);
             groupBox1.PerformLayout();
             ResumeLayout(false);
