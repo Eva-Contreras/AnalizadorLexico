@@ -2,6 +2,7 @@ namespace AnalizadorLexico
 {
     public partial class Form1 : Form
     {
+        // Instancia del recorrido para analizar el programa
         private Recorrido r = new();
 
         public Form1()
@@ -12,6 +13,9 @@ namespace AnalizadorLexico
             btnEditar.Click += btnEditar_Click;
             btnGuardar.Click += btnGuardarPrograma_Click;
             btnGuardarTokens.Click += btnGuardarTokens_Click;
+
+            rtxPrograma.KeyDown += rtxPrograma_KeyDown;
+            rtxPrograma.AcceptsTab = true;
 
             lstLineasPrograma.Font = rtxPrograma.Font;
             lstLineasPrograma.BackColor = Color.LightGray;
@@ -99,6 +103,15 @@ namespace AnalizadorLexico
         {
             rtxPrograma.ReadOnly = false;
             rtxPrograma.Focus();
+        }
+        private void rtxPrograma_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Tab)
+            {
+                rtxPrograma.SelectedText = "     "; 
+                e.SuppressKeyPress = true;
+                e.Handled = true;
+            }
         }
         private void ActualizarNumerosLinea()
         {
