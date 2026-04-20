@@ -5,7 +5,7 @@ namespace AnalizadorLexico
     public class Recorrido
     {
         // Cadena de conexión
-        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=EVA;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -76,7 +76,6 @@ namespace AnalizadorLexico
         private Dictionary<int, string> _categoriaAceptacion = new();
         private HashSet<int> _estadosFinalCadena = new();
         private bool TablaCargada = false;
-
         private void CargarTabla()
         {
             if (TablaCargada) return;
@@ -274,11 +273,10 @@ namespace AnalizadorLexico
         public string? ObtenerColumna(char c)
         {
             if (char.IsLetter(c))
-                return char.ToUpper(c).ToString(); 
+                return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                return "_" + c.ToString();
-            // return c.ToString(); 
+                return c.ToString(); 
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
@@ -365,44 +363,22 @@ namespace AnalizadorLexico
                     string cadena = "\"";
                     i++;
 
-                    // Buscar comilla de cierre o fin de línea
                     while (i < linea.Length && linea[i] != '"')
                     {
                         cadena += linea[i];
                         i++;
                     }
 
-                    // Si encontró comilla de cierre, agregarla
                     if (i < linea.Length && linea[i] == '"')
                     {
                         cadena += '"';
                         i++;
                     }
-                    // Si no encontró comilla de cierre, cadena queda sin cerrar (la variable cadena contiene '"' + texto)
 
                     tokens.Add(cadena);
                     continue;
                 }
 
-                /*if (c == '"')
-                {
-                    string cadena = "\"";
-                    i++;
-                    while (i < linea.Length && linea[i] != '"')
-                    {
-                        cadena += linea[i];
-                        i++;
-                    }
-                    if (i < linea.Length && linea[i] == '"')
-                    {
-                        cadena += '"';
-                        i++;
-                    }
-                    tokens.Add(cadena);
-                    continue;
-                }*/
-
-                // Delimitadores y operadores (se separan)
                 if (EsDelimitadorOOperador(c))
                 {
                     if (i + 1 < linea.Length)
@@ -421,7 +397,6 @@ namespace AnalizadorLexico
                     continue;
                 }
 
-                // 🆕 Carácter especial pegado a algo → token inválido completo
                 if (EsCaracterEspecial(c))
                 {
                     string tokenInvalido = "";
@@ -442,7 +417,6 @@ namespace AnalizadorLexico
                     continue;
                 }
 
-                // Identificadores / palabras
                 if (char.IsLetter(c))
                 {
                     string palabra = "";
@@ -468,7 +442,6 @@ namespace AnalizadorLexico
                     continue;
                 }
 
-                // Números con signo
                 if ((c == '+' || c == '-') && i + 1 < linea.Length && char.IsDigit(linea[i + 1]))
                 {
                     string numero = CapturarNumeroCompleto(linea, ref i, true);
@@ -476,42 +449,9 @@ namespace AnalizadorLexico
                     continue;
                 }
 
-                // Números ver 1
-                /* if (char.IsDigit(c))
-                 {
-                     string numero = CapturarNumeroCompleto(linea, ref i, false);
-                     if (i < linea.Length && char.IsLetter(linea[i]))
-                     {
-                         while (i < linea.Length && char.IsLetterOrDigit(linea[i]))
-                         {
-                             numero += linea[i];
-                             i++;
-                         }
-                     }
-                     tokens.Add(numero);
-                     continue;
-                 }*/
-                // Números ver 2
-                /*if (char.IsDigit(c))
-                {
-                    string numero = CapturarNumeroCompleto(linea, ref i, false);
-                    // Si después del número hay caracteres pegados (punto extra, letras, etc.) → token inválido único
-                    if (i < linea.Length && !char.IsWhiteSpace(linea[i]) && !EsDelimitadorOOperador(linea[i]))
-                    {
-                        while (i < linea.Length && !char.IsWhiteSpace(linea[i]) && !EsDelimitadorOOperador(linea[i]))
-                        {
-                            numero += linea[i];
-                            i++;
-                        }
-                    }
-                    tokens.Add(numero);
-                    continue;
-                }*/
-                //Numeros ver 3
                 if (char.IsDigit(c))
                 {
                     string numero = CapturarNumeroCompleto(linea, ref i, false);
-                    // Si después del número hay caracteres NO delimitadores y NO espacios, seguirlos agregando al mismo token
                     if (i < linea.Length && !char.IsWhiteSpace(linea[i]) && !EsDelimitadorOOperador(linea[i]))
                     {
                         while (i < linea.Length && !char.IsWhiteSpace(linea[i]) && !EsDelimitadorOOperador(linea[i]))
@@ -523,159 +463,23 @@ namespace AnalizadorLexico
                     tokens.Add(numero);
                     continue;
                 }
-                // Cualquier otro carácter (no debería llegar aquí con la nueva lógica)
                 tokens.Add(c.ToString());
                 i++;
             }
 
             return tokens;
         }
-               // Método para identificar delimitadores y operadores (se separan)
         private bool EsDelimitadorOOperador(char c)
         {
             return c == '=' || c == ';' || c == ',' || c == '(' || c == ')' ||
                    c == '{' || c == '}' || c == ':' || c == '<' || c == '>' ;
-                   
-            /*return c == '=' || c == ';' || c == ',' || c == '(' || c == ')' ||
-                   c == '{' || c == '}' || c == ':' || c == '<' || c == '>' ||
-                   c == '+' || c == '-' || c == '*' || c == '/';*/
         }
-
-        // Método para caracteres especiales que INVALIDAN identificadores (se pegan)
         private bool EsCaracterEspecial(char c)
         {
-            // Todos los símbolos excepto delimitadores/operadores, comillas y numeral
             return simbolos.ContainsKey(c) &&
                    c != '"' && c != '#' &&
                    !EsDelimitadorOOperador(c);
         }
-        /*private List<string> SepararEnTokens(string linea)
-        {
-            var tokens = new List<string>();
-            int i = 0;
-
-            while (i < linea.Length)
-            {
-                char c = linea[i];
-
-                if (char.IsWhiteSpace(c)) { i++; continue; }
-
-                if (c == '#')
-                {
-                    string comentario = "";
-                    while (i < linea.Length)
-                    {
-                        comentario += linea[i];
-                        i++;
-                    }
-                    tokens.Add(comentario);
-                    continue;
-                }
-
-                if (c == '"')
-                {
-                    string cadena = "\"";
-                    i++;
-
-                    while (i < linea.Length && linea[i] != '"')
-                    {
-                        cadena += linea[i];
-                        i++;
-                    }
-
-                    if (i < linea.Length && linea[i] == '"')
-                    {
-                        cadena += '"';
-                        i++;
-                    }
-
-                    tokens.Add(cadena);
-                    continue;
-                }
-
-                if (char.IsLetter(c))
-                {
-                    string palabra = "";
-                    while (i < linea.Length)
-                    {
-                        char actual = linea[i];
-
-                        // Si es letra o dígito, seguir capturando
-                        if (char.IsLetterOrDigit(actual))
-                        {
-                            palabra += actual;
-                            i++;
-                        }
-                        // Si es un carácter especial PEGADO a la palabra, incluirlo
-                        else if (EsCaracterEspecial(actual) && !char.IsWhiteSpace(actual))
-                        {
-                            palabra += actual;
-                            i++;
-                        }
-                        else
-                        {
-                            break; // Espacio u otro carácter que indica fin del token
-                        }
-                    }
-
-                    tokens.Add(palabra);
-                    continue;
-
-                    /*while (i < linea.Length && char.IsLetterOrDigit(linea[i]))
-                        palabra += linea[i++];
-                    tokens.Add(palabra);
-                    continue;
-    }
-
-                if ((c == '+' || c == '-') && i + 1 < linea.Length && char.IsDigit(linea[i + 1]))
-                {
-                    string numero = CapturarNumeroCompleto(linea, ref i, true);
-                    tokens.Add(numero);
-                    continue;
-                }
-
-                if (char.IsDigit(c))
-                {
-                    string numero = CapturarNumeroCompleto(linea, ref i, false);
-
-                    if (i < linea.Length && char.IsLetter(linea[i]))
-                    {
-                        while (i < linea.Length && char.IsLetterOrDigit(linea[i]))
-                        {
-                            numero += linea[i];
-                            i++;
-                        }
-                    }
-
-                    tokens.Add(numero);
-                    continue;
-                }
-
-                if (i + 1 < linea.Length)
-                {
-                    string doble = "" + c + linea[i + 1];
-
-                    if (doble == "==" || doble == "<>" || doble == "<=" ||
-                        doble == ">=" || doble == "><" || doble == "**")
-                    {
-                        tokens.Add(doble);
-                        i += 2;
-                        continue;
-                    }
-                }
-
-                tokens.Add(c.ToString());
-                i++;
-            }
-
-            return tokens;
-        }
-        //agregado 1
-        private bool EsCaracterEspecial(char c)
-        {
-            return simbolos.ContainsKey(c) && c != '"' && c != '#';
-        }*/
-//Separar en tokens anterior
         private string CapturarNumeroCompleto(string linea, ref int i, bool tieneSigno)
         {
             string numero = "";
