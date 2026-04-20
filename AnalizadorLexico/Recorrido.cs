@@ -5,7 +5,7 @@ namespace AnalizadorLexico
     public class Recorrido
     {
         // Cadena de conexión
-        protected string connectionString = "Server=EVA;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -149,14 +149,7 @@ namespace AnalizadorLexico
             if (cadena.StartsWith('"') && cadena.EndsWith('"'))
             {
                 return (true, "CAD", $"(0) \"...\" -> CAD");
-            } else
-                if (cadena.StartsWith('"') && !cadena.EndsWith('"'))
-                {
-                    string mensaje = _categoriaAceptacion.TryGetValue(204, out string? msg)
-                                     ? msg
-                                     : "Error por cadena no válida";
-                    return (false, mensaje, $"(0) {cadena} -> ERROR (cadena no cerrada)");
-                }
+            }
 
             if (palabrasReservadas.TryGetValue(cadena, out string? tokenReservado))
             {
@@ -276,7 +269,8 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                return c.ToString(); 
+                return "_" + c.ToString();
+            //return c.ToString(); 
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
