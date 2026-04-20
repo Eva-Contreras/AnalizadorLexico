@@ -34,6 +34,8 @@
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             groupBox1 = new GroupBox();
+            rtxPrograma = new RichTextBox();
+            lstLineasPrograma = new ListBox();
             lblTablaErrores = new Label();
             lblTablaSimbolos = new Label();
             lblArchivoTokens = new Label();
@@ -53,7 +55,6 @@
             rtxTokens = new RichTextBox();
             btnEditar = new Button();
             btnCargar = new Button();
-            rtxPrograma = new RichTextBox();
             lblDiseñadores = new Label();
             pictureBox1 = new PictureBox();
             groupBox1.SuspendLayout();
@@ -65,6 +66,8 @@
             // groupBox1
             // 
             groupBox1.BackColor = SystemColors.GradientInactiveCaption;
+            groupBox1.Controls.Add(rtxPrograma);
+            groupBox1.Controls.Add(lstLineasPrograma);
             groupBox1.Controls.Add(lblTablaErrores);
             groupBox1.Controls.Add(lblTablaSimbolos);
             groupBox1.Controls.Add(lblArchivoTokens);
@@ -78,14 +81,37 @@
             groupBox1.Controls.Add(rtxTokens);
             groupBox1.Controls.Add(btnEditar);
             groupBox1.Controls.Add(btnCargar);
-            groupBox1.Controls.Add(rtxPrograma);
-            groupBox1.Font = new Font("Segoe UI", 14F);
+            groupBox1.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
             groupBox1.Location = new Point(12, 103);
             groupBox1.Name = "groupBox1";
-            groupBox1.Size = new Size(1282, 844);
+            groupBox1.Size = new Size(1296, 844);
             groupBox1.TabIndex = 1;
             groupBox1.TabStop = false;
             groupBox1.Text = "Analizador Léxico";
+            // 
+            // rtxPrograma
+            // 
+            rtxPrograma.BorderStyle = BorderStyle.None;
+            rtxPrograma.Font = new Font("Segoe UI", 8F);
+            rtxPrograma.Location = new Point(85, 73);
+            rtxPrograma.Name = "rtxPrograma";
+            rtxPrograma.Size = new Size(442, 342);
+            rtxPrograma.TabIndex = 1;
+            rtxPrograma.Text = "";
+            // 
+            // lstLineasPrograma
+            // 
+            lstLineasPrograma.BackColor = SystemColors.HighlightText;
+            lstLineasPrograma.BorderStyle = BorderStyle.None;
+            lstLineasPrograma.Font = new Font("Segoe UI", 8F);
+            lstLineasPrograma.ForeColor = SystemColors.HighlightText;
+            lstLineasPrograma.FormattingEnabled = true;
+            lstLineasPrograma.IntegralHeight = false;
+            lstLineasPrograma.Location = new Point(38, 73);
+            lstLineasPrograma.Name = "lstLineasPrograma";
+            lstLineasPrograma.SelectionMode = SelectionMode.None;
+            lstLineasPrograma.Size = new Size(109, 342);
+            lstLineasPrograma.TabIndex = 20;
             // 
             // lblTablaErrores
             // 
@@ -111,7 +137,7 @@
             // 
             lblArchivoTokens.AutoSize = true;
             lblArchivoTokens.Font = new Font("Segoe UI", 12F);
-            lblArchivoTokens.Location = new Point(870, 38);
+            lblArchivoTokens.Location = new Point(926, 38);
             lblArchivoTokens.Name = "lblArchivoTokens";
             lblArchivoTokens.Size = new Size(206, 32);
             lblArchivoTokens.TabIndex = 17;
@@ -140,6 +166,7 @@
             // dgvSimbolos
             // 
             dgvSimbolos.AllowUserToAddRows = false;
+            dgvSimbolos.BorderStyle = BorderStyle.None;
             dataGridViewCellStyle1.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle1.BackColor = SystemColors.Control;
             dataGridViewCellStyle1.Font = new Font("Segoe UI", 8F);
@@ -163,7 +190,7 @@
             dgvSimbolos.ReadOnly = true;
             dgvSimbolos.RowHeadersWidth = 62;
             dgvSimbolos.Size = new Size(582, 225);
-            dgvSimbolos.TabIndex = 15;
+            dgvSimbolos.TabIndex = 8;
             // 
             // colNum
             // 
@@ -203,7 +230,7 @@
             btnAnalizar.BackColor = SystemColors.ActiveCaption;
             btnAnalizar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnAnalizar.ForeColor = SystemColors.ControlLightLight;
-            btnAnalizar.Location = new Point(546, 222);
+            btnAnalizar.Location = new Point(575, 221);
             btnAnalizar.Name = "btnAnalizar";
             btnAnalizar.Size = new Size(159, 64);
             btnAnalizar.TabIndex = 2;
@@ -214,6 +241,8 @@
             // dgvErrores
             // 
             dgvErrores.AllowUserToAddRows = false;
+            dgvErrores.BorderStyle = BorderStyle.None;
+            dgvErrores.CausesValidation = false;
             dataGridViewCellStyle3.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle3.BackColor = SystemColors.Control;
             dataGridViewCellStyle3.Font = new Font("Segoe UI", 8F);
@@ -237,7 +266,7 @@
             dgvErrores.ReadOnly = true;
             dgvErrores.RowHeadersWidth = 62;
             dgvErrores.Size = new Size(623, 225);
-            dgvErrores.TabIndex = 13;
+            dgvErrores.TabIndex = 7;
             // 
             // colLinea
             // 
@@ -261,10 +290,10 @@
             btnGuardarTokens.BackColor = SystemColors.ActiveCaption;
             btnGuardarTokens.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnGuardarTokens.ForeColor = SystemColors.ControlLightLight;
-            btnGuardarTokens.Location = new Point(722, 427);
+            btnGuardarTokens.Location = new Point(775, 427);
             btnGuardarTokens.Name = "btnGuardarTokens";
             btnGuardarTokens.Size = new Size(159, 100);
-            btnGuardarTokens.TabIndex = 12;
+            btnGuardarTokens.TabIndex = 6;
             btnGuardarTokens.Text = "Guardar Tokens";
             btnGuardarTokens.UseVisualStyleBackColor = false;
             // 
@@ -276,17 +305,20 @@
             btnGuardar.Location = new Point(368, 427);
             btnGuardar.Name = "btnGuardar";
             btnGuardar.Size = new Size(159, 100);
-            btnGuardar.TabIndex = 10;
+            btnGuardar.TabIndex = 5;
             btnGuardar.Text = "Guardar Programa";
             btnGuardar.UseVisualStyleBackColor = false;
             // 
             // rtxTokens
             // 
+            rtxTokens.BackColor = SystemColors.Window;
+            rtxTokens.BorderStyle = BorderStyle.None;
             rtxTokens.Font = new Font("Segoe UI", 8F);
-            rtxTokens.Location = new Point(722, 73);
+            rtxTokens.Location = new Point(775, 79);
             rtxTokens.Name = "rtxTokens";
-            rtxTokens.Size = new Size(489, 338);
-            rtxTokens.TabIndex = 11;
+            rtxTokens.ReadOnly = true;
+            rtxTokens.Size = new Size(489, 342);
+            rtxTokens.TabIndex = 9;
             rtxTokens.Text = "";
             // 
             // btnEditar
@@ -297,7 +329,7 @@
             btnEditar.Location = new Point(203, 427);
             btnEditar.Name = "btnEditar";
             btnEditar.Size = new Size(159, 100);
-            btnEditar.TabIndex = 9;
+            btnEditar.TabIndex = 4;
             btnEditar.Text = "Editar Programa";
             btnEditar.UseVisualStyleBackColor = false;
             // 
@@ -309,18 +341,9 @@
             btnCargar.Location = new Point(38, 427);
             btnCargar.Name = "btnCargar";
             btnCargar.Size = new Size(159, 100);
-            btnCargar.TabIndex = 8;
+            btnCargar.TabIndex = 3;
             btnCargar.Text = "Cargar Programa";
             btnCargar.UseVisualStyleBackColor = false;
-            // 
-            // rtxPrograma
-            // 
-            rtxPrograma.Font = new Font("Segoe UI", 8F);
-            rtxPrograma.Location = new Point(38, 73);
-            rtxPrograma.Name = "rtxPrograma";
-            rtxPrograma.Size = new Size(489, 338);
-            rtxPrograma.TabIndex = 8;
-            rtxPrograma.Text = "";
             // 
             // lblDiseñadores
             // 
@@ -349,7 +372,7 @@
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = SystemColors.GradientActiveCaption;
             BackgroundImageLayout = ImageLayout.None;
-            ClientSize = new Size(1313, 959);
+            ClientSize = new Size(1318, 959);
             Controls.Add(pictureBox1);
             Controls.Add(groupBox1);
             Controls.Add(lblDiseñadores);
@@ -370,7 +393,6 @@
         #endregion
         private GroupBox groupBox1;
         private Button btnAnalizar;
-        private RichTextBox rtxPrograma;
         private Button btnCargar;
         private Button btnEditar;
         private Button btnGuardar;
@@ -391,5 +413,7 @@
         private DataGridViewTextBoxColumn colNombre;
         private DataGridViewTextBoxColumn colTipo;
         private DataGridViewTextBoxColumn colValor;
+        private ListBox lstLineasPrograma;
+        private RichTextBox rtxPrograma;
     }
 }
