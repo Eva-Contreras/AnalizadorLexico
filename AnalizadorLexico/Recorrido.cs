@@ -390,6 +390,12 @@ namespace AnalizadorLexico
                     i++;
                     continue;
                 }
+                if ((c == '+' || c == '-') && i + 1 < linea.Length && char.IsDigit(linea[i + 1]))
+                {
+                    string numero = CapturarNumeroCompleto(linea, ref i, true);
+                    tokens.Add(numero);
+                    continue;
+                }
 
                 if (EsCaracterEspecial(c))
                 {
@@ -410,8 +416,28 @@ namespace AnalizadorLexico
                     tokens.Add(tokenInvalido);
                     continue;
                 }
-
                 if (char.IsLetter(c))
+                {
+                    string palabra = "";
+                    while (i < linea.Length)
+                    {
+                        char actual = linea[i];
+                        // Capturar todo lo que NO sea espacio ni delimitador/operador
+                        if (!char.IsWhiteSpace(actual) && !EsDelimitadorOOperador(actual))
+                        {
+                            palabra += actual;
+                            i++;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    tokens.Add(palabra);
+                    continue;
+                }
+
+                /*if (char.IsLetter(c))
                 {
                     string palabra = "";
                     while (i < linea.Length)
@@ -434,7 +460,7 @@ namespace AnalizadorLexico
                     }
                     tokens.Add(palabra);
                     continue;
-                }
+                }*/
 
                 if ((c == '+' || c == '-') && i + 1 < linea.Length && char.IsDigit(linea[i + 1]))
                 {
