@@ -26,6 +26,7 @@ namespace AnalizadorLexico
 
             rtxPrograma.TextChanged += (s, e) => ActualizarNumerosLinea();
             rtxPrograma.VScroll += (s, e) => SincronizarScroll();
+
         }
         private void btnAnalizar_Click(object? sender, EventArgs e)
         {
@@ -33,15 +34,15 @@ namespace AnalizadorLexico
 
             string texto = rtxPrograma.Text.Trim();
 
-            if (string.IsNullOrWhiteSpace(texto))  
+            if (string.IsNullOrWhiteSpace(texto))
             {
                 MessageBox.Show("Ingrese un programa para analizar.", "Aviso",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                btnAnalizar.Enabled = true;  
+                btnAnalizar.Enabled = true;
                 return;
             }
 
-            var (tokens, errores, simbolos) = r.AnalizarPrograma(texto); 
+            var (tokens, errores, simbolos) = r.AnalizarPrograma(texto);
 
             rtxTokens.Clear();
             var tokensPorLinea = tokens.GroupBy(t => t.linea).OrderBy(g => g.Key);
@@ -67,7 +68,7 @@ namespace AnalizadorLexico
             lblErrores.Text = $"Total errores: {errores.Count}";
             ActualizarNumerosLinea();
 
-            btnAnalizar.Enabled = true; 
+            btnAnalizar.Enabled = true;
         }
         private void btnCargar_Click(object? sender, EventArgs e)
         {
@@ -115,7 +116,7 @@ namespace AnalizadorLexico
         {
             if (e.KeyCode == Keys.Tab)
             {
-                rtxPrograma.SelectedText = "     "; 
+                rtxPrograma.SelectedText = "     ";
                 e.SuppressKeyPress = true;
                 e.Handled = true;
             }
@@ -137,6 +138,35 @@ namespace AnalizadorLexico
             {
                 lstLineasPrograma.TopIndex = primeraLineaVisible;
             }
+        }
+
+        private void dgvErrores_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var cellValue = dgvErrores.Rows[e.RowIndex].Cells["colLinea"].Value;
+            if (cellValue != null && int.TryParse(cellValue.ToString(), out int lineNumber))
+            {
+                IrALinea(lineNumber);
+            }
+        }
+        private void IrALinea(int numeroLinea)
+        {
+            if (numeroLinea < 1 || numeroLinea > rtxPrograma.Lines.Length) return;
+
+            int lineIndex = numeroLinea - 1;
+            int charIndex = rtxPrograma.GetFirstCharIndexFromLine(lineIndex);
+            if (charIndex < 0) return;
+
+            rtxPrograma.Select(charIndex, 0);
+            rtxPrograma.ScrollToCaret();
+            rtxPrograma.Focus();
+
+        }
+
+        private void dgvSimbolos_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            
         }
     }
 }
