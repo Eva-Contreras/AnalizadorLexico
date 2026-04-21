@@ -57,7 +57,7 @@ namespace AnalizadorLexico
             }
 
             dgvSimbolos.Rows.Clear();
-            foreach (var (id, nombre) in simbolos.OrderBy(s => s.id))
+            foreach (var (id, nombre) in simbolos)
                 dgvSimbolos.Rows.Add(id, nombre, "", "");
 
             dgvErrores.Rows.Clear();
@@ -92,6 +92,13 @@ namespace AnalizadorLexico
         }
         private void btnGuardarTokens_Click(object? sender, EventArgs e)
         {
+            if (dgvErrores.Rows.Count > 0)
+            {
+                MessageBox.Show("No se puede guardar, el programa contiene errores léxicos.",
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
+
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
                 sfd.Filter = "Archivos de texto|*.txt";

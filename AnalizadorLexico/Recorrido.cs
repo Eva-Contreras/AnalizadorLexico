@@ -5,7 +5,7 @@ namespace AnalizadorLexico
     public class Recorrido
     {
         // Cadena de conexión
-        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=EVA;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -269,21 +269,21 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                return "_" + c.ToString();
-            //return c.ToString(); 
+                //return "_" + c.ToString();
+                return c.ToString(); 
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
 
             return null;
         }
-        public (List<(int linea, string valor, string token)> tokens,List<(int linea, string valor, string error)> errores,List<(int id, string nombre)> simbolos) AnalizarPrograma(string textoCompleto)
+        public (List<(int linea, string valor, string token)> tokens,List<(int linea, string valor, string error)> errores, LinkedList<(int id, string nombre)> simbolos) AnalizarPrograma(string textoCompleto)
         {
             CargarTabla();
             var tokens = new List<(int, string, string)>();
             var errores = new List<(int, string, string)>();
-            var simbolos = new List<(int id, string nombre)>();
-            var diccionarioSimbolos = new Dictionary<string, int>();
+            var simbolos = new LinkedList<(int id, string nombre)>();
+            var nombresRegistrados = new HashSet<string>();
             int contadorIDV = 1;
 
             var lineas = textoCompleto.Split('\n');
@@ -305,14 +305,13 @@ namespace AnalizadorLexico
                     {
                         if (tokenTipo == "IDV")
                         {
-                            if (!diccionarioSimbolos.ContainsKey(tokenCrudo))
+                            if (!nombresRegistrados.Contains(tokenCrudo))
                             {
-                                diccionarioSimbolos[tokenCrudo] = contadorIDV;
-                                simbolos.Add((contadorIDV, tokenCrudo));
+                                nombresRegistrados.Add(tokenCrudo);
+                                simbolos.AddLast((contadorIDV, tokenCrudo));
                                 contadorIDV++;
                             }
-
-                            int id = diccionarioSimbolos[tokenCrudo];
+                            int id = simbolos.First(s => s.nombre == tokenCrudo).id;
                             tokens.Add((numLinea + 1, tokenCrudo, $"IDV{id:D2}"));
                         }
                         else
