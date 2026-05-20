@@ -540,7 +540,7 @@
             // 
             pictureBox2.BorderStyle = BorderStyle.FixedSingle;
             pictureBox2.Image = Properties.Resources.Logo;
-            pictureBox2.Location = new Point(24, 5);
+            pictureBox2.Location = new Point(9, 5);
             pictureBox2.Margin = new Padding(2);
             pictureBox2.Name = "pictureBox2";
             pictureBox2.Size = new Size(66, 53);
