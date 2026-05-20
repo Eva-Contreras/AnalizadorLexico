@@ -2,9 +2,8 @@ namespace AnalizadorLexico
 {
     public partial class Form1 : Form
     {
-        // Instancia del recorrido para analizar el programa
         private Recorrido r = new();
-
+        private AnalizadorSintactico _sintactico = new();
         public Form1()
         {
             InitializeComponent();
@@ -13,6 +12,7 @@ namespace AnalizadorLexico
             btnEditar.Click += btnEditar_Click;
             btnGuardar.Click += btnGuardarPrograma_Click;
             btnGuardarTokens.Click += btnGuardarTokens_Click;
+            btnSintaxis.Click += btnSintaxis_Click;
 
             rtxPrograma.KeyDown += rtxPrograma_KeyDown;
             rtxPrograma.AcceptsTab = true;
@@ -139,7 +139,6 @@ namespace AnalizadorLexico
                 lstLineasPrograma.TopIndex = primeraLineaVisible;
             }
         }
-
         private void dgvErrores_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -163,10 +162,39 @@ namespace AnalizadorLexico
             rtxPrograma.Focus();
 
         }
-
-        private void dgvSimbolos_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        private void btnSintaxis_Click(object? sender, EventArgs e)
         {
-            
+            if (dgvErrores.Rows.Count > 0)
+            {
+                MessageBox.Show("Corrija los errores léxicos antes de analizar la sintaxis.",
+                    "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string texto = rtxPrograma.Text.Trim();
+            if (string.IsNullOrWhiteSpace(texto))
+            {
+                MessageBox.Show("Ingrese un programa para analizar.", "Aviso",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var (tokens, _, _) = r.AnalizarPrograma(texto);
+
+            bool valido = _sintactico.Analizar(tokens);
+
+            rtxSintaxis.Clear();
+            foreach (string paso in _sintactico.Pasos)
+            {
+                rtxSintaxis.SelectionColor = paso.Contains("ERROR") ? Color.Red
+                                           : paso.Contains("✔") ? Color.Green
+                                           : Color.Black;
+                rtxSintaxis.AppendText(paso + "\n");
+            }
+
+            dgvSintaxis.Rows.Clear();
+            foreach (string error in _sintactico.Errores)
+                dgvSintaxis.Rows.Add("-", error);
         }
     }
 }

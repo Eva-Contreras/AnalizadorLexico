@@ -5,7 +5,7 @@ namespace AnalizadorLexico
     public class Recorrido
     {
         // Cadena de conexión
-        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=EVA;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -40,7 +40,7 @@ namespace AnalizadorLexico
             {'\\', "BACKSLASH"}
         };
         private static readonly Dictionary<string, string> palabrasReservadas = new()
-    {
+        {
         {"LEER", "PR1"},
         {"leer", "PR1"},
         {"IMPRIMIR", "PR2"},
@@ -269,8 +269,8 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                return "_" + c.ToString();
-               // return c.ToString(); 
+                //return "_" + c.ToString();
+                return c.ToString(); 
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;

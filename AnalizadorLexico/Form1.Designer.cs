@@ -32,6 +32,7 @@
             DataGridViewCellStyle dataGridViewCellStyle2 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             groupBox1 = new GroupBox();
             rtxPrograma = new RichTextBox();
@@ -57,10 +58,19 @@
             btnCargar = new Button();
             lblDiseñadores = new Label();
             pictureBox1 = new PictureBox();
+            groupBox2 = new GroupBox();
+            btnSintaxis = new Button();
+            rtxSintaxis = new RichTextBox();
+            label1 = new Label();
+            dgvSintaxis = new DataGridView();
+            dataGridViewTextBoxColumn1 = new DataGridViewTextBoxColumn();
+            dataGridViewTextBoxColumn2 = new DataGridViewTextBoxColumn();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvSimbolos).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvErrores).BeginInit();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).BeginInit();
+            groupBox2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)dgvSintaxis).BeginInit();
             SuspendLayout();
             // 
             // groupBox1
@@ -82,11 +92,9 @@
             groupBox1.Controls.Add(btnEditar);
             groupBox1.Controls.Add(btnCargar);
             groupBox1.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
-            groupBox1.Location = new Point(8, 62);
-            groupBox1.Margin = new Padding(2);
+            groupBox1.Location = new Point(11, 103);
             groupBox1.Name = "groupBox1";
-            groupBox1.Padding = new Padding(2);
-            groupBox1.Size = new Size(907, 506);
+            groupBox1.Size = new Size(1101, 816);
             groupBox1.TabIndex = 1;
             groupBox1.TabStop = false;
             groupBox1.Text = "Analizador Léxico";
@@ -95,10 +103,9 @@
             // 
             rtxPrograma.BorderStyle = BorderStyle.None;
             rtxPrograma.Font = new Font("Segoe UI", 8F);
-            rtxPrograma.Location = new Point(60, 44);
-            rtxPrograma.Margin = new Padding(2);
+            rtxPrograma.Location = new Point(90, 73);
             rtxPrograma.Name = "rtxPrograma";
-            rtxPrograma.Size = new Size(309, 205);
+            rtxPrograma.Size = new Size(356, 342);
             rtxPrograma.TabIndex = 1;
             rtxPrograma.Text = "";
             // 
@@ -110,21 +117,19 @@
             lstLineasPrograma.ForeColor = SystemColors.HighlightText;
             lstLineasPrograma.FormattingEnabled = true;
             lstLineasPrograma.IntegralHeight = false;
-            lstLineasPrograma.Location = new Point(27, 44);
-            lstLineasPrograma.Margin = new Padding(2);
+            lstLineasPrograma.Location = new Point(43, 73);
             lstLineasPrograma.Name = "lstLineasPrograma";
             lstLineasPrograma.SelectionMode = SelectionMode.None;
-            lstLineasPrograma.Size = new Size(76, 205);
+            lstLineasPrograma.Size = new Size(109, 342);
             lstLineasPrograma.TabIndex = 20;
             // 
             // lblTablaErrores
             // 
             lblTablaErrores.AutoSize = true;
             lblTablaErrores.Font = new Font("Segoe UI", 12F);
-            lblTablaErrores.Location = new Point(174, 324);
-            lblTablaErrores.Margin = new Padding(2, 0, 2, 0);
+            lblTablaErrores.Location = new Point(149, 517);
             lblTablaErrores.Name = "lblTablaErrores";
-            lblTablaErrores.Size = new Size(120, 21);
+            lblTablaErrores.Size = new Size(183, 32);
             lblTablaErrores.TabIndex = 19;
             lblTablaErrores.Text = "Tabla de errores";
             // 
@@ -132,10 +137,9 @@
             // 
             lblTablaSimbolos.AutoSize = true;
             lblTablaSimbolos.Font = new Font("Segoe UI", 12F);
-            lblTablaSimbolos.Location = new Point(609, 324);
-            lblTablaSimbolos.Margin = new Padding(2, 0, 2, 0);
+            lblTablaSimbolos.Location = new Point(739, 517);
             lblTablaSimbolos.Name = "lblTablaSimbolos";
-            lblTablaSimbolos.Size = new Size(133, 21);
+            lblTablaSimbolos.Size = new Size(204, 32);
             lblTablaSimbolos.TabIndex = 18;
             lblTablaSimbolos.Text = "Tabla de símbolos";
             // 
@@ -143,10 +147,9 @@
             // 
             lblArchivoTokens.AutoSize = true;
             lblArchivoTokens.Font = new Font("Segoe UI", 12F);
-            lblArchivoTokens.Location = new Point(648, 23);
-            lblArchivoTokens.Margin = new Padding(2, 0, 2, 0);
+            lblArchivoTokens.Location = new Point(708, 38);
             lblArchivoTokens.Name = "lblArchivoTokens";
-            lblArchivoTokens.Size = new Size(134, 21);
+            lblArchivoTokens.Size = new Size(206, 32);
             lblArchivoTokens.TabIndex = 17;
             lblArchivoTokens.Text = "Archivo de tokens";
             // 
@@ -154,10 +157,9 @@
             // 
             lblErrores.AutoSize = true;
             lblErrores.Font = new Font("Segoe UI", 10F);
-            lblErrores.Location = new Point(27, 482);
-            lblErrores.Margin = new Padding(2, 0, 2, 0);
+            lblErrores.Location = new Point(6, 780);
             lblErrores.Name = "lblErrores";
-            lblErrores.Size = new Size(88, 19);
+            lblErrores.Size = new Size(124, 28);
             lblErrores.TabIndex = 14;
             lblErrores.Text = "Total errores:";
             // 
@@ -165,10 +167,9 @@
             // 
             lblProgramaFuente.AutoSize = true;
             lblProgramaFuente.Font = new Font("Segoe UI", 12F);
-            lblProgramaFuente.Location = new Point(127, 23);
-            lblProgramaFuente.Margin = new Padding(2, 0, 2, 0);
+            lblProgramaFuente.Location = new Point(139, 38);
             lblProgramaFuente.Name = "lblProgramaFuente";
-            lblProgramaFuente.Size = new Size(127, 21);
+            lblProgramaFuente.Size = new Size(193, 32);
             lblProgramaFuente.TabIndex = 16;
             lblProgramaFuente.Text = "Programa fuente";
             // 
@@ -194,14 +195,12 @@
             dataGridViewCellStyle2.SelectionForeColor = SystemColors.HighlightText;
             dataGridViewCellStyle2.WrapMode = DataGridViewTriState.False;
             dgvSimbolos.DefaultCellStyle = dataGridViewCellStyle2;
-            dgvSimbolos.Location = new Point(477, 345);
-            dgvSimbolos.Margin = new Padding(2);
+            dgvSimbolos.Location = new Point(568, 552);
             dgvSimbolos.Name = "dgvSimbolos";
             dgvSimbolos.ReadOnly = true;
             dgvSimbolos.RowHeadersWidth = 62;
-            dgvSimbolos.Size = new Size(407, 135);
+            dgvSimbolos.Size = new Size(514, 225);
             dgvSimbolos.TabIndex = 8;
-            dgvSimbolos.CellDoubleClick += dgvSimbolos_CellDoubleClick;
             // 
             // colNum
             // 
@@ -210,7 +209,7 @@
             colNum.MinimumWidth = 8;
             colNum.Name = "colNum";
             colNum.ReadOnly = true;
-            colNum.Width = 39;
+            colNum.Width = 55;
             // 
             // colNombre
             // 
@@ -241,10 +240,9 @@
             btnAnalizar.BackColor = SystemColors.ActiveCaption;
             btnAnalizar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnAnalizar.ForeColor = SystemColors.ControlLightLight;
-            btnAnalizar.Location = new Point(402, 133);
-            btnAnalizar.Margin = new Padding(2);
+            btnAnalizar.Location = new Point(452, 205);
             btnAnalizar.Name = "btnAnalizar";
-            btnAnalizar.Size = new Size(111, 38);
+            btnAnalizar.Size = new Size(159, 63);
             btnAnalizar.TabIndex = 2;
             btnAnalizar.Text = "Analizar";
             btnAnalizar.UseVisualStyleBackColor = false;
@@ -273,12 +271,11 @@
             dataGridViewCellStyle4.SelectionForeColor = SystemColors.HighlightText;
             dataGridViewCellStyle4.WrapMode = DataGridViewTriState.False;
             dgvErrores.DefaultCellStyle = dataGridViewCellStyle4;
-            dgvErrores.Location = new Point(27, 345);
-            dgvErrores.Margin = new Padding(2);
+            dgvErrores.Location = new Point(6, 552);
             dgvErrores.Name = "dgvErrores";
             dgvErrores.ReadOnly = true;
             dgvErrores.RowHeadersWidth = 62;
-            dgvErrores.Size = new Size(436, 135);
+            dgvErrores.Size = new Size(534, 225);
             dgvErrores.TabIndex = 7;
             dgvErrores.CellDoubleClick += dgvErrores_CellDoubleClick;
             // 
@@ -289,7 +286,7 @@
             colLinea.MinimumWidth = 8;
             colLinea.Name = "colLinea";
             colLinea.ReadOnly = true;
-            colLinea.Width = 59;
+            colLinea.Width = 83;
             // 
             // colError
             // 
@@ -304,10 +301,9 @@
             btnGuardarTokens.BackColor = SystemColors.ActiveCaption;
             btnGuardarTokens.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnGuardarTokens.ForeColor = SystemColors.ControlLightLight;
-            btnGuardarTokens.Location = new Point(542, 256);
-            btnGuardarTokens.Margin = new Padding(2);
+            btnGuardarTokens.Location = new Point(739, 427);
             btnGuardarTokens.Name = "btnGuardarTokens";
-            btnGuardarTokens.Size = new Size(111, 60);
+            btnGuardarTokens.Size = new Size(133, 77);
             btnGuardarTokens.TabIndex = 6;
             btnGuardarTokens.Text = "Guardar Tokens";
             btnGuardarTokens.UseVisualStyleBackColor = false;
@@ -317,10 +313,9 @@
             btnGuardar.BackColor = SystemColors.ActiveCaption;
             btnGuardar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnGuardar.ForeColor = SystemColors.ControlLightLight;
-            btnGuardar.Location = new Point(258, 256);
-            btnGuardar.Margin = new Padding(2);
+            btnGuardar.Location = new Point(335, 427);
             btnGuardar.Name = "btnGuardar";
-            btnGuardar.Size = new Size(111, 60);
+            btnGuardar.Size = new Size(141, 77);
             btnGuardar.TabIndex = 5;
             btnGuardar.Text = "Guardar Programa";
             btnGuardar.UseVisualStyleBackColor = false;
@@ -330,11 +325,10 @@
             rtxTokens.BackColor = SystemColors.Window;
             rtxTokens.BorderStyle = BorderStyle.None;
             rtxTokens.Font = new Font("Segoe UI", 8F);
-            rtxTokens.Location = new Point(542, 47);
-            rtxTokens.Margin = new Padding(2);
+            rtxTokens.Location = new Point(617, 79);
             rtxTokens.Name = "rtxTokens";
             rtxTokens.ReadOnly = true;
-            rtxTokens.Size = new Size(342, 205);
+            rtxTokens.Size = new Size(382, 342);
             rtxTokens.TabIndex = 9;
             rtxTokens.Text = "";
             // 
@@ -343,10 +337,9 @@
             btnEditar.BackColor = SystemColors.ActiveCaption;
             btnEditar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnEditar.ForeColor = SystemColors.ControlLightLight;
-            btnEditar.Location = new Point(142, 256);
-            btnEditar.Margin = new Padding(2);
+            btnEditar.Location = new Point(169, 427);
             btnEditar.Name = "btnEditar";
-            btnEditar.Size = new Size(111, 60);
+            btnEditar.Size = new Size(141, 77);
             btnEditar.TabIndex = 4;
             btnEditar.Text = "Editar Programa";
             btnEditar.UseVisualStyleBackColor = false;
@@ -356,10 +349,9 @@
             btnCargar.BackColor = SystemColors.ActiveCaption;
             btnCargar.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
             btnCargar.ForeColor = SystemColors.ControlLightLight;
-            btnCargar.Location = new Point(27, 256);
-            btnCargar.Margin = new Padding(2);
+            btnCargar.Location = new Point(5, 427);
             btnCargar.Name = "btnCargar";
-            btnCargar.Size = new Size(111, 60);
+            btnCargar.Size = new Size(141, 77);
             btnCargar.TabIndex = 3;
             btnCargar.Text = "Cargar Programa";
             btnCargar.UseVisualStyleBackColor = false;
@@ -368,10 +360,9 @@
             // 
             lblDiseñadores.AutoSize = true;
             lblDiseñadores.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            lblDiseñadores.Location = new Point(71, 5);
-            lblDiseñadores.Margin = new Padding(2, 0, 2, 0);
+            lblDiseñadores.Location = new Point(101, 8);
             lblDiseñadores.Name = "lblDiseñadores";
-            lblDiseñadores.Size = new Size(313, 57);
+            lblDiseñadores.Size = new Size(450, 84);
             lblDiseñadores.TabIndex = 3;
             lblDiseñadores.Text = "Diseñadores:\r\n- 23100150 Eva Guadalupe Contreras Antúnez\r\n- 23100201 Anapaula Rendón Montalvo";
             // 
@@ -379,27 +370,114 @@
             // 
             pictureBox1.BorderStyle = BorderStyle.FixedSingle;
             pictureBox1.Image = Properties.Resources.Logo;
-            pictureBox1.Location = new Point(9, 11);
-            pictureBox1.Margin = new Padding(2);
+            pictureBox1.Location = new Point(13, 18);
             pictureBox1.Name = "pictureBox1";
-            pictureBox1.Size = new Size(58, 46);
+            pictureBox1.Size = new Size(82, 75);
             pictureBox1.SizeMode = PictureBoxSizeMode.StretchImage;
             pictureBox1.TabIndex = 4;
             pictureBox1.TabStop = false;
             // 
+            // groupBox2
+            // 
+            groupBox2.BackColor = SystemColors.GradientInactiveCaption;
+            groupBox2.Controls.Add(btnSintaxis);
+            groupBox2.Controls.Add(rtxSintaxis);
+            groupBox2.Controls.Add(label1);
+            groupBox2.Controls.Add(dgvSintaxis);
+            groupBox2.Font = new Font("Segoe UI", 14F, FontStyle.Bold);
+            groupBox2.Location = new Point(1118, 103);
+            groupBox2.Name = "groupBox2";
+            groupBox2.Size = new Size(537, 816);
+            groupBox2.TabIndex = 5;
+            groupBox2.TabStop = false;
+            groupBox2.Text = "Analizador Sintáctico";
+            // 
+            // btnSintaxis
+            // 
+            btnSintaxis.BackColor = SystemColors.ActiveCaption;
+            btnSintaxis.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            btnSintaxis.ForeColor = SystemColors.ControlLightLight;
+            btnSintaxis.Location = new Point(196, 295);
+            btnSintaxis.Name = "btnSintaxis";
+            btnSintaxis.Size = new Size(159, 63);
+            btnSintaxis.TabIndex = 21;
+            btnSintaxis.Text = "Sintaxis";
+            btnSintaxis.UseVisualStyleBackColor = false;
+            btnSintaxis.Click += btnSintaxis_Click;
+            // 
+            // rtxSintaxis
+            // 
+            rtxSintaxis.BackColor = SystemColors.Window;
+            rtxSintaxis.BorderStyle = BorderStyle.None;
+            rtxSintaxis.Font = new Font("Segoe UI", 8F);
+            rtxSintaxis.Location = new Point(17, 366);
+            rtxSintaxis.Name = "rtxSintaxis";
+            rtxSintaxis.ReadOnly = true;
+            rtxSintaxis.Size = new Size(514, 411);
+            rtxSintaxis.TabIndex = 21;
+            rtxSintaxis.Text = "";
+            // 
+            // label1
+            // 
+            label1.AutoSize = true;
+            label1.Font = new Font("Segoe UI", 12F);
+            label1.Location = new Point(174, 51);
+            label1.Name = "label1";
+            label1.Size = new Size(207, 32);
+            label1.TabIndex = 20;
+            label1.Text = "Errores Sintácticos";
+            // 
+            // dgvSintaxis
+            // 
+            dgvSintaxis.AllowUserToAddRows = false;
+            dgvSintaxis.BorderStyle = BorderStyle.None;
+            dgvSintaxis.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvSintaxis.Columns.AddRange(new DataGridViewColumn[] { dataGridViewTextBoxColumn1, dataGridViewTextBoxColumn2 });
+            dataGridViewCellStyle5.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle5.BackColor = SystemColors.Window;
+            dataGridViewCellStyle5.Font = new Font("Segoe UI", 8F);
+            dataGridViewCellStyle5.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle5.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle5.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle5.WrapMode = DataGridViewTriState.False;
+            dgvSintaxis.DefaultCellStyle = dataGridViewCellStyle5;
+            dgvSintaxis.Location = new Point(17, 86);
+            dgvSintaxis.Name = "dgvSintaxis";
+            dgvSintaxis.ReadOnly = true;
+            dgvSintaxis.RowHeadersWidth = 62;
+            dgvSintaxis.Size = new Size(514, 203);
+            dgvSintaxis.TabIndex = 19;
+            // 
+            // dataGridViewTextBoxColumn1
+            // 
+            dataGridViewTextBoxColumn1.AutoSizeMode = DataGridViewAutoSizeColumnMode.ColumnHeader;
+            dataGridViewTextBoxColumn1.HeaderText = "Línea";
+            dataGridViewTextBoxColumn1.MinimumWidth = 8;
+            dataGridViewTextBoxColumn1.Name = "dataGridViewTextBoxColumn1";
+            dataGridViewTextBoxColumn1.ReadOnly = true;
+            dataGridViewTextBoxColumn1.Width = 122;
+            // 
+            // dataGridViewTextBoxColumn2
+            // 
+            dataGridViewTextBoxColumn2.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            dataGridViewTextBoxColumn2.HeaderText = "Error";
+            dataGridViewTextBoxColumn2.MinimumWidth = 8;
+            dataGridViewTextBoxColumn2.Name = "dataGridViewTextBoxColumn2";
+            dataGridViewTextBoxColumn2.ReadOnly = true;
+            // 
             // Form1
             // 
-            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleDimensions = new SizeF(10F, 25F);
             AutoScaleMode = AutoScaleMode.Font;
             BackColor = SystemColors.GradientActiveCaption;
             BackgroundImageLayout = ImageLayout.None;
-            ClientSize = new Size(923, 449);
+            ClientSize = new Size(1663, 925);
+            Controls.Add(groupBox2);
             Controls.Add(pictureBox1);
             Controls.Add(groupBox1);
             Controls.Add(lblDiseñadores);
             DoubleBuffered = true;
             Icon = (Icon)resources.GetObject("$this.Icon");
-            Margin = new Padding(2);
             Name = "Form1";
             StartPosition = FormStartPosition.CenterScreen;
             Text = "CÇ - Comme ci, comme ça (Beta)";
@@ -408,6 +486,9 @@
             ((System.ComponentModel.ISupportInitialize)dgvSimbolos).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvErrores).EndInit();
             ((System.ComponentModel.ISupportInitialize)pictureBox1).EndInit();
+            groupBox2.ResumeLayout(false);
+            groupBox2.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)dgvSintaxis).EndInit();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -437,5 +518,12 @@
         private DataGridViewTextBoxColumn colValor;
         private ListBox lstLineasPrograma;
         private RichTextBox rtxPrograma;
+        private GroupBox groupBox2;
+        private Label label1;
+        private DataGridView dgvSintaxis;
+        private DataGridViewTextBoxColumn dataGridViewTextBoxColumn1;
+        private DataGridViewTextBoxColumn dataGridViewTextBoxColumn2;
+        private RichTextBox rtxSintaxis;
+        private Button btnSintaxis;
     }
 }
