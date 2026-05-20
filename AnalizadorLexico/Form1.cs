@@ -184,6 +184,43 @@ namespace AnalizadorLexico
             bool valido = _sintactico.Analizar(tokens);
 
             rtxSintaxis.Clear();
+            dgvSintaxis.Rows.Clear();
+
+            if (valido)
+            {
+                rtxSintaxis.SelectionColor = Color.Green;
+                rtxSintaxis.AppendText("✔ Análisis sintáctico completado — programa aceptado, sin errores.");
+            }
+            else
+            {
+                foreach (string error in _sintactico.Errores)
+                {
+                    rtxSintaxis.SelectionColor = Color.Red;
+                    rtxSintaxis.AppendText(error + "\n");
+                    dgvSintaxis.Rows.Add("-", error);
+                }
+            }
+
+            /*if (dgvErrores.Rows.Count > 0)
+            {
+                MessageBox.Show("Corrija los errores léxicos antes de analizar la sintaxis.",
+                    "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string texto = rtxPrograma.Text.Trim();
+            if (string.IsNullOrWhiteSpace(texto))
+            {
+                MessageBox.Show("Ingrese un programa para analizar.", "Aviso",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var (tokens, _, _) = r.AnalizarPrograma(texto);
+
+            bool valido = _sintactico.Analizar(tokens);
+
+            rtxSintaxis.Clear();
             foreach (string paso in _sintactico.Pasos)
             {
                 rtxSintaxis.SelectionColor = paso.Contains("ERROR") ? Color.Red
@@ -194,7 +231,12 @@ namespace AnalizadorLexico
 
             dgvSintaxis.Rows.Clear();
             foreach (string error in _sintactico.Errores)
-                dgvSintaxis.Rows.Add("-", error);
+                dgvSintaxis.Rows.Add("-", error);*/
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }
