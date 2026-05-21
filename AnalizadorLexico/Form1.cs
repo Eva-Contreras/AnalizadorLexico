@@ -189,7 +189,7 @@ namespace AnalizadorLexico
             if (valido)
             {
                 rtxSintaxis.SelectionColor = Color.Green;
-                rtxSintaxis.AppendText("✔ Análisis sintáctico completado — programa aceptado, sin errores.");
+                rtxSintaxis.AppendText("Análisis sintáctico completado: Programa aceptado, sin errores.");
             }
             else
             {
@@ -197,41 +197,17 @@ namespace AnalizadorLexico
                 {
                     rtxSintaxis.SelectionColor = Color.Red;
                     rtxSintaxis.AppendText(error + "\n");
-                    dgvSintaxis.Rows.Add("-", error);
+                    string linea = "-";
+                    int idx = error.IndexOf("línea ");
+                    if (idx >= 0)
+                    {
+                        string resto = error.Substring(idx + 6);
+                        string numStr = new string(resto.TakeWhile(char.IsDigit).ToArray());
+                        if (!string.IsNullOrEmpty(numStr)) linea = numStr;
+                    }
+                    dgvSintaxis.Rows.Add(linea, error);
                 }
             }
-
-            /*if (dgvErrores.Rows.Count > 0)
-            {
-                MessageBox.Show("Corrija los errores léxicos antes de analizar la sintaxis.",
-                    "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            string texto = rtxPrograma.Text.Trim();
-            if (string.IsNullOrWhiteSpace(texto))
-            {
-                MessageBox.Show("Ingrese un programa para analizar.", "Aviso",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var (tokens, _, _) = r.AnalizarPrograma(texto);
-
-            bool valido = _sintactico.Analizar(tokens);
-
-            rtxSintaxis.Clear();
-            foreach (string paso in _sintactico.Pasos)
-            {
-                rtxSintaxis.SelectionColor = paso.Contains("ERROR") ? Color.Red
-                                           : paso.Contains("✔") ? Color.Green
-                                           : Color.Black;
-                rtxSintaxis.AppendText(paso + "\n");
-            }
-
-            dgvSintaxis.Rows.Clear();
-            foreach (string error in _sintactico.Errores)
-                dgvSintaxis.Rows.Add("-", error);*/
         }
 
         private void Form1_Load(object sender, EventArgs e)
