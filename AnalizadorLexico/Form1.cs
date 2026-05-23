@@ -167,8 +167,12 @@ namespace AnalizadorLexico
             if (dgvErrores.Rows.Count > 0)
             {
                 MessageBox.Show("Corrija los errores léxicos antes de analizar la sintaxis.",
-                    "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                 "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                tabControl1.SelectedTab = tabPage1;
                 return;
+                /*MessageBox.Show("Corrija los errores léxicos antes de analizar la sintaxis.",
+                    "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;*/
             }
 
             string texto = rtxPrograma.Text.Trim();
@@ -197,6 +201,24 @@ namespace AnalizadorLexico
                 {
                     rtxSintaxis.SelectionColor = Color.Red;
                     rtxSintaxis.AppendText(error + "\n");
+
+                    string linea = "-";
+                    int idx = error.LastIndexOf("línea ");
+                    if (idx >= 0)
+                    {
+                        string resto = error.Substring(idx + 6);
+                        string numStr = new string(resto.TakeWhile(char.IsDigit).ToArray());
+                        if (!string.IsNullOrEmpty(numStr)) linea = numStr;
+                    }
+                    dgvSintaxis.Rows.Add(linea, error);
+                }
+            }
+            /*else
+            {
+                foreach (string error in _sintactico.Errores)
+                {
+                    rtxSintaxis.SelectionColor = Color.Red;
+                    rtxSintaxis.AppendText(error + "\n");
                     string linea = "-";
                     int idx = error.IndexOf("línea ");
                     if (idx >= 0)
@@ -207,12 +229,24 @@ namespace AnalizadorLexico
                     }
                     dgvSintaxis.Rows.Add(linea, error);
                 }
-            }
+            }*/
         }
 
         private void Form1_Load(object sender, EventArgs e)
         {
 
+        }
+
+        private void dgvSintaxis_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var cellValue = dgvSintaxis.Rows[e.RowIndex].Cells[0].Value;
+            if (cellValue != null && int.TryParse(cellValue.ToString(), out int lineNumber))
+            {
+                tabControl1.SelectedTab = tabPage1;
+                IrALinea(lineNumber);
+            }
         }
     }
 }
