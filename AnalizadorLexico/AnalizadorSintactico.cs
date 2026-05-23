@@ -252,7 +252,7 @@
             Consumir("CD5", "Se esperaba ';' después de inicialización en 'para'");
             ParseCondic();
             Consumir("CD5", "Se esperaba ';' después de condición en 'para'");
-            // Incremento: IDV OPA ARG2  (asignación sin CD5)
+            
             ParseARG1();
             Consumir("OPA", "Se esperaba '=' en incremento de 'para'");
             ParseARG2();
@@ -389,7 +389,7 @@
 
             if (EsCadeLiteral(TokenActual.token))
             {
-                // Puede ser solo un literal o el inicio de una OPA: CAD OA IDV
+                
                 int posTemp = _pos + 1;
                 if (posTemp < _tokens.Count && EsOA(_tokens[posTemp].token))
                     ParseOPA();
@@ -423,7 +423,7 @@
             }
             else if (EsID(TokenActual.token) || EsCN(TokenActual.token) || TokenActual.token == "CD3")
             {
-                // Lookahead para ver si es CONDIC
+                
                 int posTemp = _pos;
                 AvanzarARG7Lookahead(ref posTemp);
                 string opSig = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
