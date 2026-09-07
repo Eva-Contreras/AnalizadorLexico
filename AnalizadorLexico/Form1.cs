@@ -232,11 +232,6 @@ namespace AnalizadorLexico
             }*/
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
         private void dgvSintaxis_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
