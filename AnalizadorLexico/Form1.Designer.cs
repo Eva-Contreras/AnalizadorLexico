@@ -33,8 +33,8 @@
             DataGridViewCellStyle dataGridViewCellStyle3 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle4 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle5 = new DataGridViewCellStyle();
-            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
             DataGridViewCellStyle dataGridViewCellStyle6 = new DataGridViewCellStyle();
+            DataGridViewCellStyle dataGridViewCellStyle7 = new DataGridViewCellStyle();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             groupBox1 = new GroupBox();
             rtxPrograma = new RichTextBox();
@@ -73,21 +73,21 @@
             tabPage2 = new TabPage();
             label2 = new Label();
             tabPage3 = new TabPage();
-            label3 = new Label();
-            pictureBox3 = new PictureBox();
             groupBox3 = new GroupBox();
-            btnSemantica = new Button();
-            richTextBox1 = new RichTextBox();
-            label4 = new Label();
-            dgvSemantica = new DataGridView();
-            dataGridViewTextBoxColumn3 = new DataGridViewTextBoxColumn();
-            dataGridViewTextBoxColumn4 = new DataGridViewTextBoxColumn();
             label5 = new Label();
             dgvTablaSimbolos = new DataGridView();
             dataGridViewTextBoxColumn5 = new DataGridViewTextBoxColumn();
             dataGridViewTextBoxColumn6 = new DataGridViewTextBoxColumn();
             dataGridViewTextBoxColumn7 = new DataGridViewTextBoxColumn();
             dataGridViewTextBoxColumn8 = new DataGridViewTextBoxColumn();
+            btnSemantica = new Button();
+            richTextBox1 = new RichTextBox();
+            label4 = new Label();
+            dgvSemantica = new DataGridView();
+            dataGridViewTextBoxColumn3 = new DataGridViewTextBoxColumn();
+            dataGridViewTextBoxColumn4 = new DataGridViewTextBoxColumn();
+            label3 = new Label();
+            pictureBox3 = new PictureBox();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvSimbolos).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvErrores).BeginInit();
@@ -99,10 +99,10 @@
             ((System.ComponentModel.ISupportInitialize)pictureBox2).BeginInit();
             tabPage2.SuspendLayout();
             tabPage3.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)pictureBox3).BeginInit();
             groupBox3.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)dgvSemantica).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvTablaSimbolos).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)dgvSemantica).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBox3).BeginInit();
             SuspendLayout();
             // 
             // groupBox1
@@ -573,27 +573,6 @@
             tabPage3.TabIndex = 2;
             tabPage3.Text = "Analizador Semántico";
             // 
-            // label3
-            // 
-            label3.AutoSize = true;
-            label3.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
-            label3.Location = new Point(105, 12);
-            label3.Name = "label3";
-            label3.Size = new Size(450, 84);
-            label3.TabIndex = 8;
-            label3.Text = "Diseñadores:\r\n- 23100150 Eva Guadalupe Contreras Antúnez\r\n- 23100201 Anapaula Rendón Montalvo";
-            // 
-            // pictureBox3
-            // 
-            pictureBox3.BorderStyle = BorderStyle.FixedSingle;
-            pictureBox3.Image = Properties.Resources.Logo;
-            pictureBox3.Location = new Point(17, 17);
-            pictureBox3.Name = "pictureBox3";
-            pictureBox3.Size = new Size(82, 75);
-            pictureBox3.SizeMode = PictureBoxSizeMode.StretchImage;
-            pictureBox3.TabIndex = 7;
-            pictureBox3.TabStop = false;
-            // 
             // groupBox3
             // 
             groupBox3.BackColor = SystemColors.GradientInactiveCaption;
@@ -610,78 +589,6 @@
             groupBox3.TabIndex = 9;
             groupBox3.TabStop = false;
             groupBox3.Text = "Analizador Semántico";
-            // 
-            // btnSemantica
-            // 
-            btnSemantica.BackColor = SystemColors.ActiveCaption;
-            btnSemantica.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            btnSemantica.ForeColor = SystemColors.ControlLightLight;
-            btnSemantica.Location = new Point(6, 245);
-            btnSemantica.Name = "btnSemantica";
-            btnSemantica.Size = new Size(141, 63);
-            btnSemantica.TabIndex = 21;
-            btnSemantica.Text = "Semantica";
-            btnSemantica.UseVisualStyleBackColor = false;
-            // 
-            // richTextBox1
-            // 
-            richTextBox1.BackColor = SystemColors.Window;
-            richTextBox1.BorderStyle = BorderStyle.None;
-            richTextBox1.Font = new Font("Segoe UI", 8F);
-            richTextBox1.Location = new Point(153, 330);
-            richTextBox1.Name = "richTextBox1";
-            richTextBox1.ReadOnly = true;
-            richTextBox1.Size = new Size(721, 174);
-            richTextBox1.TabIndex = 21;
-            richTextBox1.Text = "";
-            // 
-            // label4
-            // 
-            label4.AutoSize = true;
-            label4.Font = new Font("Segoe UI", 12F);
-            label4.Location = new Point(153, 54);
-            label4.Name = "label4";
-            label4.Size = new Size(216, 32);
-            label4.TabIndex = 20;
-            label4.Text = "Errores Semánticos";
-            // 
-            // dgvSemantica
-            // 
-            dgvSemantica.AllowUserToAddRows = false;
-            dgvSemantica.BorderStyle = BorderStyle.None;
-            dgvSemantica.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dgvSemantica.Columns.AddRange(new DataGridViewColumn[] { dataGridViewTextBoxColumn3, dataGridViewTextBoxColumn4 });
-            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleLeft;
-            dataGridViewCellStyle7.BackColor = SystemColors.Window;
-            dataGridViewCellStyle7.Font = new Font("Segoe UI", 8F);
-            dataGridViewCellStyle7.ForeColor = SystemColors.ControlText;
-            dataGridViewCellStyle7.SelectionBackColor = SystemColors.Highlight;
-            dataGridViewCellStyle7.SelectionForeColor = SystemColors.HighlightText;
-            dataGridViewCellStyle7.WrapMode = DataGridViewTriState.False;
-            dgvSemantica.DefaultCellStyle = dataGridViewCellStyle7;
-            dgvSemantica.Location = new Point(153, 105);
-            dgvSemantica.Name = "dgvSemantica";
-            dgvSemantica.ReadOnly = true;
-            dgvSemantica.RowHeadersWidth = 62;
-            dgvSemantica.Size = new Size(721, 203);
-            dgvSemantica.TabIndex = 19;
-            // 
-            // dataGridViewTextBoxColumn3
-            // 
-            dataGridViewTextBoxColumn3.AutoSizeMode = DataGridViewAutoSizeColumnMode.ColumnHeader;
-            dataGridViewTextBoxColumn3.HeaderText = "Línea";
-            dataGridViewTextBoxColumn3.MinimumWidth = 8;
-            dataGridViewTextBoxColumn3.Name = "dataGridViewTextBoxColumn3";
-            dataGridViewTextBoxColumn3.ReadOnly = true;
-            dataGridViewTextBoxColumn3.Width = 122;
-            // 
-            // dataGridViewTextBoxColumn4
-            // 
-            dataGridViewTextBoxColumn4.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            dataGridViewTextBoxColumn4.HeaderText = "Error";
-            dataGridViewTextBoxColumn4.MinimumWidth = 8;
-            dataGridViewTextBoxColumn4.Name = "dataGridViewTextBoxColumn4";
-            dataGridViewTextBoxColumn4.ReadOnly = true;
             // 
             // label5
             // 
@@ -747,6 +654,101 @@
             dataGridViewTextBoxColumn8.Name = "dataGridViewTextBoxColumn8";
             dataGridViewTextBoxColumn8.ReadOnly = true;
             // 
+            // btnSemantica
+            // 
+            btnSemantica.BackColor = SystemColors.ActiveCaption;
+            btnSemantica.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            btnSemantica.ForeColor = SystemColors.ControlLightLight;
+            btnSemantica.Location = new Point(6, 245);
+            btnSemantica.Name = "btnSemantica";
+            btnSemantica.Size = new Size(141, 63);
+            btnSemantica.TabIndex = 21;
+            btnSemantica.Text = "Semantica";
+            btnSemantica.UseVisualStyleBackColor = false;
+            btnSemantica.Click += btnSemantica_Click;
+            // 
+            // richTextBox1
+            // 
+            richTextBox1.BackColor = SystemColors.Window;
+            richTextBox1.BorderStyle = BorderStyle.None;
+            richTextBox1.Font = new Font("Segoe UI", 8F);
+            richTextBox1.Location = new Point(153, 330);
+            richTextBox1.Name = "richTextBox1";
+            richTextBox1.ReadOnly = true;
+            richTextBox1.Size = new Size(721, 174);
+            richTextBox1.TabIndex = 21;
+            richTextBox1.Text = "";
+            // 
+            // label4
+            // 
+            label4.AutoSize = true;
+            label4.Font = new Font("Segoe UI", 12F);
+            label4.Location = new Point(153, 54);
+            label4.Name = "label4";
+            label4.Size = new Size(216, 32);
+            label4.TabIndex = 20;
+            label4.Text = "Errores Semánticos";
+            // 
+            // dgvSemantica
+            // 
+            dgvSemantica.AllowUserToAddRows = false;
+            dgvSemantica.BorderStyle = BorderStyle.None;
+            dgvSemantica.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dgvSemantica.Columns.AddRange(new DataGridViewColumn[] { dataGridViewTextBoxColumn3, dataGridViewTextBoxColumn4 });
+            dataGridViewCellStyle7.Alignment = DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle7.BackColor = SystemColors.Window;
+            dataGridViewCellStyle7.Font = new Font("Segoe UI", 8F);
+            dataGridViewCellStyle7.ForeColor = SystemColors.ControlText;
+            dataGridViewCellStyle7.SelectionBackColor = SystemColors.Highlight;
+            dataGridViewCellStyle7.SelectionForeColor = SystemColors.HighlightText;
+            dataGridViewCellStyle7.WrapMode = DataGridViewTriState.False;
+            dgvSemantica.DefaultCellStyle = dataGridViewCellStyle7;
+            dgvSemantica.Location = new Point(153, 105);
+            dgvSemantica.Name = "dgvSemantica";
+            dgvSemantica.ReadOnly = true;
+            dgvSemantica.RowHeadersWidth = 62;
+            dgvSemantica.Size = new Size(721, 203);
+            dgvSemantica.TabIndex = 19;
+            dgvSemantica.CellDoubleClick += dgvSemantica_CellDoubleClick;
+            // 
+            // dataGridViewTextBoxColumn3
+            // 
+            dataGridViewTextBoxColumn3.AutoSizeMode = DataGridViewAutoSizeColumnMode.ColumnHeader;
+            dataGridViewTextBoxColumn3.HeaderText = "Línea";
+            dataGridViewTextBoxColumn3.MinimumWidth = 8;
+            dataGridViewTextBoxColumn3.Name = "dataGridViewTextBoxColumn3";
+            dataGridViewTextBoxColumn3.ReadOnly = true;
+            dataGridViewTextBoxColumn3.Width = 122;
+            // 
+            // dataGridViewTextBoxColumn4
+            // 
+            dataGridViewTextBoxColumn4.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            dataGridViewTextBoxColumn4.HeaderText = "Error";
+            dataGridViewTextBoxColumn4.MinimumWidth = 8;
+            dataGridViewTextBoxColumn4.Name = "dataGridViewTextBoxColumn4";
+            dataGridViewTextBoxColumn4.ReadOnly = true;
+            // 
+            // label3
+            // 
+            label3.AutoSize = true;
+            label3.Font = new Font("Segoe UI", 10F, FontStyle.Bold);
+            label3.Location = new Point(105, 12);
+            label3.Name = "label3";
+            label3.Size = new Size(450, 84);
+            label3.TabIndex = 8;
+            label3.Text = "Diseñadores:\r\n- 23100150 Eva Guadalupe Contreras Antúnez\r\n- 23100201 Anapaula Rendón Montalvo";
+            // 
+            // pictureBox3
+            // 
+            pictureBox3.BorderStyle = BorderStyle.FixedSingle;
+            pictureBox3.Image = Properties.Resources.Logo;
+            pictureBox3.Location = new Point(17, 17);
+            pictureBox3.Name = "pictureBox3";
+            pictureBox3.Size = new Size(82, 75);
+            pictureBox3.SizeMode = PictureBoxSizeMode.StretchImage;
+            pictureBox3.TabIndex = 7;
+            pictureBox3.TabStop = false;
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(10F, 25F);
@@ -777,11 +779,11 @@
             tabPage2.PerformLayout();
             tabPage3.ResumeLayout(false);
             tabPage3.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)pictureBox3).EndInit();
             groupBox3.ResumeLayout(false);
             groupBox3.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)dgvSemantica).EndInit();
             ((System.ComponentModel.ISupportInitialize)dgvTablaSimbolos).EndInit();
+            ((System.ComponentModel.ISupportInitialize)dgvSemantica).EndInit();
+            ((System.ComponentModel.ISupportInitialize)pictureBox3).EndInit();
             ResumeLayout(false);
         }
 

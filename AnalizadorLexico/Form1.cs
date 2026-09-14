@@ -4,6 +4,7 @@ namespace AnalizadorLexico
     {
         private Recorrido r = new();
         private AnalizadorSintactico _sintactico = new();
+        private AnalizadorSemantico _semantico = new(); // NUEVA LÍNEA
         public Form1()
         {
             InitializeComponent();
@@ -237,6 +238,103 @@ namespace AnalizadorLexico
             if (e.RowIndex < 0) return;
 
             var cellValue = dgvSintaxis.Rows[e.RowIndex].Cells[0].Value;
+            if (cellValue != null && int.TryParse(cellValue.ToString(), out int lineNumber))
+            {
+                tabControl1.SelectedTab = tabPage1;
+                IrALinea(lineNumber);
+            }
+        }
+
+        private void btnSemantica_Click(object? sender, EventArgs e)
+        {
+            // Validar que no haya errores léxicos
+            if (dgvErrores.Rows.Count > 0)
+            {
+                MessageBox.Show("Corrija los errores léxicos antes de analizar la semántica.",
+                    "Errores léxicos", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                tabControl1.SelectedTab = tabPage1;
+                return;
+            }
+
+            // Validar que no haya errores sintácticos
+            if (dgvSintaxis.Rows.Count > 0)
+            {
+                DialogResult result = MessageBox.Show(
+                    "El programa tiene errores sintácticos. ¿Desea continuar con el análisis semántico de todas formas?",
+                    "Errores sintácticos", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                if (result == DialogResult.No)
+                {
+                    tabControl1.SelectedTab = tabPage2;
+                    return;
+                }
+            }
+
+            string texto = rtxPrograma.Text.Trim();
+            if (string.IsNullOrWhiteSpace(texto))
+            {
+                MessageBox.Show("Ingrese un programa para analizar.", "Aviso",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Obtener tokens del análisis léxico
+            var (tokens, _, _) = r.AnalizarPrograma(texto);
+
+            // Ejecutar análisis semántico
+            bool valido = _semantico.Analizar(tokens);
+
+            // Limpiar resultados anteriores
+            richTextBox1.Clear();
+            dgvSemantica.Rows.Clear();
+            dgvTablaSimbolos.Rows.Clear();
+
+            if (valido)
+            {
+                richTextBox1.SelectionColor = Color.Green;
+                richTextBox1.AppendText("Análisis semántico completado: Programa aceptado, sin errores de tipos.");
+            }
+            else
+            {
+                richTextBox1.SelectionColor = Color.Red;
+                foreach (string error in _semantico.Errores)
+                {
+                    richTextBox1.AppendText(error + "\n");
+
+                    // Extraer número de línea del error
+                    string linea = "-";
+                    int idx = error.LastIndexOf("línea ");
+                    if (idx >= 0)
+                    {
+                        string resto = error.Substring(idx + 6);
+                        string numStr = new string(resto.TakeWhile(char.IsDigit).ToArray());
+                        if (!string.IsNullOrEmpty(numStr)) linea = numStr;
+                    }
+                    dgvSemantica.Rows.Add(linea, error);
+                }
+            }
+
+            // Mostrar tabla de símbolos final
+            foreach (var simbolo in _semantico.TablaSimbolosFinal)
+            {
+                dgvTablaSimbolos.Rows.Add(
+                    simbolo.Id,
+                    simbolo.Nombre,
+                    simbolo.Tipo,
+                    simbolo.Valor
+                );
+            }
+
+            // Nota: traza de depuración deshabilitada en la interfaz
+
+            // Cambiar a la pestaña semántica
+            tabControl1.SelectedTab = tabPage3;
+        }
+
+        private void dgvSemantica_CellDoubleClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var cellValue = dgvSemantica.Rows[e.RowIndex].Cells[0].Value;
             if (cellValue != null && int.TryParse(cellValue.ToString(), out int lineNumber))
             {
                 tabControl1.SelectedTab = tabPage1;
