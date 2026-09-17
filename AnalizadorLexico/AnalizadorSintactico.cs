@@ -65,10 +65,9 @@
             Consumir("ENT", "Se esperaba 'ENT'");
             ParseARG1();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            if (TokenActual.token == "CNU")
-                Avanzar();
-            else
-                Error($"Se esperaba constante entera (CNU) en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
+            // Sintaxis: aceptar cualquier expresión válida aquí; la comprobación de tipos
+            // debe realizarla el analizador semántico.
+            ParseARG2();
             Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
             Pasos.Add("[ENT] Declaración reconocida ✔");
         }
@@ -79,10 +78,8 @@
             Consumir("DEC", "Se esperaba 'DEC'");
             ParseARG1();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            if (TokenActual.token == "CNR")
-                Avanzar();
-            else
-                Error($"Se esperaba constante real (CNR) en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
+            // Aceptar cualquier expresión; la semántica comprobará que sea numérica
+            ParseARG2();
             Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
             Pasos.Add("[DEC] Declaración reconocida ✔");
         }
@@ -93,10 +90,8 @@
             Consumir("CAD", "Se esperaba 'CAD'");
             ParseARG1();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            if (EsCadeLiteral(TokenActual.token))
-                Avanzar();
-            else
-                Error($"Se esperaba literal de cadena en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
+            // Dejar que el analizador semántico valide que aquí vaya una cadena si procede
+            ParseARG2();
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
             Pasos.Add("[CAD] Declaración reconocida ✔");
         }
