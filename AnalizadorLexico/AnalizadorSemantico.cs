@@ -7,7 +7,6 @@
         private int _ultimaLineaConsumida = 0;
         private Dictionary<string, Simbolo> _tablaSimbolos = new();
         public List<string> Errores { get; private set; } = new();
-        // Registro de trazas temporales para depuración (se puede consultar desde la UI)
         public List<string> DebugLog { get; private set; } = new();
         public List<Simbolo> TablaSimbolosFinal { get; private set; } = new();
 
@@ -18,7 +17,6 @@
             _tokens = tokens.Where(t => t.token != "COM").ToList();
             _pos = 0;
             _ultimaLineaConsumida = 0;
-            // limpiar estado y traza
             Errores.Clear();
             DebugLog.Clear();
             DebugLog.Add("Analizar: inicio");
@@ -30,7 +28,6 @@
                 while (TokenActual.token != "EOF")
                     ParseS();
 
-                // Copiar tabla de símbolos final
                 TablaSimbolosFinal = _tablaSimbolos.Values.ToList();
 
                 return Errores.Count == 0;
@@ -41,8 +38,6 @@
                 return false;
             }
         }
-
-        #region Métodos de parsing con verificación de tipos
 
         private void ParseS()
         {
@@ -78,7 +73,6 @@
         {
             DebugLog.Add($"ParseDeclaracionENT at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             Consumir("ENT", "Se esperaba 'ENT'");
-            // Guardar información antes de consumir el identificador
             string id = TokenActual.valor;
             int lineaDeclaracion = TokenActual.linea;
             if (!EsID(TokenActual.token))
@@ -101,7 +95,6 @@
 
             Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
 
-            // Registrar en tabla de símbolos (usar la línea original del identificador)
             RegistrarSimbolo(id, "ENT", valor, lineaDeclaracion);
         }
 
@@ -109,7 +102,6 @@
         {
             DebugLog.Add($"ParseDeclaracionDEC at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             Consumir("DEC", "Se esperaba 'DEC'");
-            // Guardar información antes de consumir el identificador
             string id = TokenActual.valor;
             int lineaDeclaracion = TokenActual.linea;
             if (!EsID(TokenActual.token))
@@ -139,7 +131,6 @@
         {
             DebugLog.Add($"ParseDeclaracionCAD at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             Consumir("CAD", "Se esperaba 'CAD'");
-            // Guardar información antes de consumir el identificador
             string id = TokenActual.valor;
             int lineaDeclaracion = TokenActual.linea;
             if (!EsID(TokenActual.token))
@@ -182,14 +173,12 @@
 
             Consumir("CD5", "Se esperaba ';' al final de asignación");
 
-            // Verificar que la variable existe
             if (!_tablaSimbolos.ContainsKey(id))
             {
                 Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                 return;
             }
 
-            // Verificar compatibilidad de tipos
             var simbolo = _tablaSimbolos[id];
             if (!TiposCompatibles(simbolo.Tipo, tipoRHS))
             {
@@ -214,7 +203,6 @@
             Consumir("CD4", "Se esperaba ')' en 'leer'");
             Consumir("CD5", "Se esperaba ';' al final de 'leer'");
 
-            // Verificar que la variable existe
             if (!_tablaSimbolos.ContainsKey(id))
             {
                 Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
@@ -227,7 +215,7 @@
             Consumir("PR2", "Se esperaba 'imprimir'");
             Consumir("CD3", "Se esperaba '(' después de 'imprimir'");
 
-            ParseARG2(); // Cualquier tipo es válido para imprimir
+            ParseARG2(); 
 
             Consumir("CD4", "Se esperaba ')' en 'imprimir'");
             Consumir("CD5", "Se esperaba ';' al final de 'imprimir'");
@@ -237,7 +225,7 @@
         {
             DebugLog.Add($"ParseRetornar at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             Consumir("PR3", "Se esperaba 'retornar'");
-            ParseARG2(); // Verifica tipo pero no lo usamos
+            ParseARG2(); 
             Consumir("CD5", "Se esperaba ';' al final de 'retornar'");
         }
 
@@ -252,7 +240,6 @@
             Consumir("CD4", "Se esperaba ')' después de la condición");
             Consumir("CD1", "Se esperaba '{' para abrir bloque SI");
 
-            // Verificar que la condición sea booleana
             if (tipoCond != "BOOL")
             {
                 Error($"Se esperaba condición booleana en línea {TokenActual.linea}");
@@ -359,7 +346,6 @@
             Consumir("CD3", "Se esperaba '(' después de 'para'");
             Consumir("ENT", "Se esperaba 'ENT' en inicialización de 'para'");
 
-            // Identificador e inicialización del contador del PARA
             string id = TokenActual.valor;
             int lineaDeclaracion = TokenActual.linea;
             if (!EsID(TokenActual.token))
@@ -372,7 +358,6 @@
 
             Consumir("OPA", "Se esperaba '=' en inicialización de 'para'");
 
-            // Valor inicial debe ser constante entera
             string initValor = TokenActual.valor;
             if (TokenActual.token != "CNU")
             {
@@ -384,8 +369,6 @@
 
             Consumir("CD5", "Se esperaba ';' después de inicialización en 'para'");
 
-            // Registrar el contador del PARA en la tabla de símbolos para que
-            // pueda usarse en la condición y en el incremento.
             if (!_tablaSimbolos.ContainsKey(id))
                 RegistrarSimbolo(id, "ENT", initValor, lineaDeclaracion);
 
@@ -406,7 +389,6 @@
 
             Consumir("CD4", "Se esperaba ')' para cerrar cabecera de 'para'");
 
-            // Verificar compatibilidad de tipos en el incremento (si no hubo error al parsear el incremento)
             if (tipoIncremento != "ERROR")
             {
                 if (!_tablaSimbolos.ContainsKey(idIncremento))
@@ -496,10 +478,8 @@
             Consumir(TokenActual.token, "Se esperaba operador lógico");
             string tipo2 = ParseARG7();
 
-            // Si alguno ya falló, propagar error sin cascada
             if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
 
-            // Verificar que los operandos sean booleanos
             if (tipo1 != "BOOL" || tipo2 != "BOOL")
             {
                 Error($"Operación lógica requiere operandos booleanos en línea {TokenActual.linea}");
@@ -519,10 +499,8 @@
             }
             Consumir(TokenActual.token, "Se esperaba operador relacional");
             string tipo2 = ParseARG7();
-            // Si alguno ya falló, propagar error sin cascada
             if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
 
-            // Verificar que los tipos sean compatibles para comparación
             if (!TiposCompatibles(tipo1, tipo2))
             {
                 Error($"Tipos incompatibles en operación relacional: {tipo1} y {tipo2} en línea {TokenActual.linea}");
@@ -559,11 +537,9 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                // Verificar que la variable existe
                 if (!_tablaSimbolos.ContainsKey(id))
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
-                    // Consumir posible operación aritmética para evitar tokens sueltos
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
                     {
                         Avanzar();
@@ -572,11 +548,9 @@
                     return "ERROR";
                 }
 
-                // Manejar operaciones aritméticas posteriores: ID (op ID|CNU)*
                 string tipoLeft = _tablaSimbolos[id].Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    // consumir operador
                     Avanzar();
                     string tipoRight = ParseARG4();
                     if (tipoLeft == "ERROR" || tipoRight == "ERROR") return "ERROR";
@@ -599,7 +573,6 @@
             else
             {
                 Error($"Se esperaba identificador, número o expresión en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                // Consumir token inesperado para evitar que se repita el mismo error en cascada
                 Avanzar();
                 return "ERROR";
             }
@@ -613,29 +586,24 @@
                 string literal = TokenActual.valor;
                 Consumir("CAD", "Se esperaba literal de cadena");
 
-                // Verificar si hay operación aritmética después y manejar concatenación
                 if (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    // Operador actual (por ejemplo '+')
                     string opToken = TokenActual.token;
                     string opValor = TokenActual.valor;
                     Consumir(TokenActual.token, "Se esperaba operador aritmético");
 
-                    // Parsear operando derecho
                     string tipoRight = ParseARG4();
                     if (tipoRight == "ERROR") return "ERROR";
 
                     bool esMas = opValor == "+" || opToken == "OA1" || opToken == "MAS";
                     if (esMas)
                     {
-                        // '+' permite concatenación cadena+cadena o cadena+num
                         if (tipoRight == "CAD" || EsNumerico(tipoRight))
                             return "CAD";
                         Error($"Operador '+' no admite operandos de tipo {tipoRight} en línea {TokenActual.linea}");
                         return "ERROR";
                     }
 
-                    // Otros operadores no son válidos con cadena
                     Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: CAD y {tipoRight}");
                     return "ERROR";
                 }
@@ -658,7 +626,6 @@
                     return "ERROR";
                 }
 
-                // Manejar operaciones aritméticas posteriores al identificador
                 string tipoLeft = _tablaSimbolos[id].Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
@@ -688,7 +655,6 @@
             else
             {
                 Error($"Se esperaba argumento válido en ARG2, se encontró '{TokenActual.valor}' en línea {TokenActual.linea}");
-                // Evitar cascada: consumir el token inesperado
                 Avanzar();
                 return "ERROR";
             }
@@ -753,31 +719,25 @@
                 string tipo1 = ParseARG4();
                 if (EsOA(TokenActual.token))
                 {
-                    // Guardar información del operador para permitir concatenación de cadenas con '+'
                     string opToken = TokenActual.token;
                     string opValor = TokenActual.valor;
                     Consumir(TokenActual.token, "Se esperaba operador aritmético");
                     string tipo2 = ParseARG4();
 
-                    // Si alguno ya falló, propagar sin mensajes extra
                     if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
 
-                    // Si el operador es '+' permitir concatenación cadena+cadena o cadena+num
                     bool esMas = opValor == "+" || opToken == "OA1" || opToken == "MAS";
                     if (esMas && (tipo1 == "CAD" || tipo2 == "CAD"))
                     {
-                        // Resulta en cadena
                         return "CAD";
                     }
 
-                    // Para otros operadores o si ninguno es cadena, requerir operandos numéricos
                     if (!EsNumerico(tipo1) || !EsNumerico(tipo2))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipo1} y {tipo2}");
                         return "ERROR";
                     }
 
-                    // Determinar tipo resultante
                     if (tipo1 == "DEC" || tipo2 == "DEC")
                         return "DEC";
                     return "ENT";
@@ -803,7 +763,6 @@
                 if (!_tablaSimbolos.ContainsKey(id))
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
-                    // Si hay una operación aritmética siguiente, consumirla para evitar dejar '+' u otros tokens sueltos
                     int posTemp = _pos;
                     if (posTemp < _tokens.Count && EsOA(_tokens[posTemp].token))
                         ParseOPA();
@@ -825,15 +784,10 @@
             else
             {
                 Error($"Se esperaba identificador, número, cadena o expresión aritmética en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                // Consumir token inesperado para evitar errores repetidos
                 Avanzar();
                 return "ERROR";
             }
         }
-
-        #endregion
-
-        #region Métodos auxiliares
 
         private void RegistrarSimbolo(string id, string tipo, string valor, int linea)
         {
@@ -870,7 +824,6 @@
         private bool EsCN(string token) => token == "CNU" || token == "CNR";
         private bool EsOL(string token) => token == "OL1" || token == "OL2" || token == "OL3";
         private bool EsOR(string token) => token == "OR1" || token == "OR2" || token == "OR3" || token == "OR4" || token == "OR5" || token == "OR6";
-        // Aceptar tanto tokens OA generados por la tabla como nombres directos de operadores ('MAS','MENOS','ASTERISCO','SLASH')
         private bool EsOA(string token) =>
             token == "OA1" || token == "OA2" || token == "OA3" || token == "OA4" || token == "OA5"
             || token == "MAS" || token == "MENOS" || token == "ASTERISCO" || token == "SLASH";
@@ -885,7 +838,6 @@
             else
             {
                 Error($"{mensajeError} — línea {TokenActual.linea}, se encontró '{TokenActual.valor}' ({TokenActual.token})");
-                // Intentar recuperación mínima: avanzar un token para evitar bucles
                 Avanzar();
             }
         }
@@ -932,8 +884,6 @@
             }
         }
 
-        // Avanza hasta el final de la sentencia actual (punto y coma) o hasta
-        // un cierre de bloque/parentesis para re-sincronizar el análisis.
         private void SkipToEndOfStatement()
         {
             while (_pos < _tokens.Count && TokenActual.token != "CD5" && TokenActual.token != "CD2" && TokenActual.token != "CD4" && TokenActual.token != "EOF")
@@ -945,7 +895,6 @@
                 Avanzar();
         }
 
-        #endregion
     }
 
     public class Simbolo

@@ -4,7 +4,7 @@ namespace AnalizadorLexico
     {
         private Recorrido r = new();
         private AnalizadorSintactico _sintactico = new();
-        private AnalizadorSemantico _semantico = new(); // NUEVA LÍNEA
+        private AnalizadorSemantico _semantico = new(); 
         public Form1()
         {
             InitializeComponent();
