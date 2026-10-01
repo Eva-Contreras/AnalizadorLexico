@@ -93,43 +93,32 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // aceptar inicializador: constante entera o identificador de tipo ENT
-            if (TokenActual.token == "CNU")
+            // Guardar token inicial para potencial valor literal/identificador
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
+            // Parsear cualquier expresión/valor válido en RHS
+            string tipoInit = ParseARG2();
+
+            Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
+
+            if (tipoInit == "ERROR") return;
+
+            // inicializador debe ser ENT (no permitir DEC -> ENT implicitamente)
+            if (tipoInit != "ENT")
             {
-                string valor = TokenActual.valor;
-                Consumir("CNU", "Se esperaba constante entera");
-                Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
-                RegistrarSimbolo(id, "ENT", valor, lineaDeclaracion);
+                Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {TokenActual.linea}");
                 return;
             }
-            else if (EsID(TokenActual.token))
-            {
-                string idInit = TokenActual.valor;
-                Consumir(TokenActual.token, "Se esperaba identificador como inicializador");
-                if (!_tablaSimbolos.ContainsKey(idInit))
-                {
-                    Error($"Variable '{idInit}' no declarada en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                // inicializador debe ser ENT (no permitir DEC -> ENT implicitamente)
-                string tipoInit = _tablaSimbolos[idInit].Tipo;
-                if (tipoInit != "ENT")
-                {
-                    Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
-                RegistrarSimbolo(id, "ENT", idInit, lineaDeclaracion);
-                return;
-            }
-            else
-            {
-                Error($"Se esperaba constante entera o identificador en declaración ENT en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                SkipToEndOfStatement();
-                return;
-            }
+
+            // Determinar valor a registrar cuando sea literal o identificador
+            string valorRegistrar = "";
+            if (tokenInicio == "CNU") // constante entera literal
+                valorRegistrar = valorInicio;
+            else if (EsID(tokenInicio)) // identificador: registrar el nombre (como antes)
+                valorRegistrar = valorInicio;
+
+            RegistrarSimbolo(id, "ENT", valorRegistrar, lineaDeclaracion);
         }
 
         private void ParseDeclaracionDEC()
@@ -147,42 +136,30 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // aceptar inicializador: constante numérica (CNR/CNU) o identificador numérico
-            if (TokenActual.token == "CNR" || TokenActual.token == "CNU")
+            // Guardar token inicial para potencial valor literal/identificador
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
+            // Aceptar expresión numérica (constante, identificador o expresión aritmética)
+            string tipoInit = ParseARG2();
+
+            Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
+
+            if (tipoInit == "ERROR") return;
+
+            if (!EsNumerico(tipoInit))
             {
-                string valor = TokenActual.valor;
-                Consumir(TokenActual.token, "Se esperaba constante numérica");
-                Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
-                RegistrarSimbolo(id, "DEC", valor, lineaDeclaracion);
+                Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {TokenActual.linea}");
                 return;
             }
-            else if (EsID(TokenActual.token))
-            {
-                string idInit = TokenActual.valor;
-                Consumir(TokenActual.token, "Se esperaba identificador como inicializador");
-                if (!_tablaSimbolos.ContainsKey(idInit))
-                {
-                    Error($"Variable '{idInit}' no declarada en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                string tipoInit = _tablaSimbolos[idInit].Tipo;
-                if (!EsNumerico(tipoInit))
-                {
-                    Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
-                RegistrarSimbolo(id, "DEC", idInit, lineaDeclaracion);
-                return;
-            }
-            else
-            {
-                Error($"Se esperaba constante numérica o identificador en declaración DEC en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                SkipToEndOfStatement();
-                return;
-            }
+
+            string valorRegistrar = "";
+            if (tokenInicio == "CNU" || tokenInicio == "CNR") // constante numérica literal
+                valorRegistrar = valorInicio;
+            else if (EsID(tokenInicio))
+                valorRegistrar = valorInicio;
+
+            RegistrarSimbolo(id, "DEC", valorRegistrar, lineaDeclaracion);
         }
 
         private void ParseDeclaracionCAD()
@@ -200,18 +177,36 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            string valor = TokenActual.valor;
-            if (TokenActual.token != "CAD")
-            {
-                Error($"Se esperaba literal de cadena en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                SkipToEndOfStatement();
-                return;
-            }
-            Consumir("CAD", "Se esperaba literal de cadena");
+            // Guardar token inicial para posible literal o identificador
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
+            // Permitir expresiones de tipo cadena (usar el parser existente)
+            string tipoInit = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
 
-            RegistrarSimbolo(id, "CAD", valor, lineaDeclaracion);
+            if (tipoInit == "ERROR") return;
+
+            if (tipoInit != "CAD")
+            {
+                Error($"Tipo incompatible en inicialización de CAD: {tipoInit} en línea {TokenActual.linea}");
+                return;
+            }
+
+            // Registrar valor si es literal o identificador con valor conocido
+            string valorRegistrar = "";
+            if (tokenInicio == "CAD")
+            {
+                valorRegistrar = valorInicio;
+            }
+            else if (EsID(tokenInicio))
+            {
+                if (_tablaSimbolos.TryGetValue(valorInicio, out var sim))
+                    valorRegistrar = sim.Valor ?? "";
+            }
+
+            RegistrarSimbolo(id, "CAD", valorRegistrar, lineaDeclaracion);
         }
 
         private void ParseAsignacion()
@@ -227,6 +222,10 @@
 
             Consumir("OPA", "Se esperaba '=' en asignación");
 
+            // Guardar token inicial para posible valor literal/identificador
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
             string tipoRHS = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de asignación");
@@ -241,6 +240,29 @@
             if (!TiposCompatibles(simbolo.Tipo, tipoRHS))
             {
                 Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {TokenActual.linea}");
+                return;
+            }
+
+            // Si RHS fue un literal o un identificador con valor conocido, actualizar el valor en la tabla
+            if (tipoRHS != "ERROR")
+            {
+                string valorRegistrar = "";
+                if (tokenInicio == "CNU" || tokenInicio == "CNR")
+                {
+                    valorRegistrar = valorInicio;
+                }
+                else if (EsID(tokenInicio))
+                {
+                    string idInit = valorInicio;
+                    if (_tablaSimbolos.TryGetValue(idInit, out var simInit))
+                    {
+                        valorRegistrar = simInit.Valor ?? "";
+                        // si queremos almacenar el nombre del identificador en lugar del valor, usar idInit
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(valorRegistrar))
+                    _tablaSimbolos[id].Valor = valorRegistrar;
             }
         }
 
@@ -373,7 +395,6 @@
 
             ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque 'mientras'");
-            Consumir("CD5", "Se esperaba ';' al final de 'mientras'");
         }
 
         private void ParseHacer()
@@ -613,14 +634,39 @@
                 string tipoLeft = _tablaSimbolos[id].Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    Avanzar();
+                    // Capturamos el operador actual antes de consumir/avanzar
+                    string opToken = TokenActual.token;
+                    string opLexema = TokenActual.valor;
+                    Avanzar(); // consumir el operador
                     string tipoRight = ParseARG4();
                     if (tipoLeft == "ERROR" || tipoRight == "ERROR") return "ERROR";
+
+                    // Si el operador es '+' permitimos concatenación de CAD o suma numérica
+                    bool esMas = opToken == "MAS" || opLexema == "+" || opToken == "OA1";
+                    if (esMas)
+                    {
+                        if (tipoLeft == "CAD" && tipoRight == "CAD")
+                        {
+                            tipoLeft = "CAD";
+                            continue;
+                        }
+                        if (EsNumerico(tipoLeft) && EsNumerico(tipoRight))
+                        {
+                            tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
+                            continue;
+                        }
+                        // mezcla inválida con '+'
+                        Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
+                        return "ERROR";
+                    }
+
+                    // Para los demás operadores, exigir operandos numéricos
                     if (!EsNumerico(tipoLeft) || !EsNumerico(tipoRight))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
                         return "ERROR";
                     }
+
                     tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                 }
 
@@ -682,6 +728,7 @@
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
                     {
+                        // skip operator and rhs to recover
                         Avanzar();
                         ParseARG4();
                     }
@@ -691,14 +738,41 @@
                 string tipoLeft = _tablaSimbolos[id].Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    Avanzar();
+                    // capture operator before consuming
+                    string opToken = TokenActual.token;
+                    string opLexema = TokenActual.valor;
+                    Consumir(TokenActual.token, "Se esperaba operador aritmético");
+
                     string tipoRight = ParseARG4();
                     if (tipoLeft == "ERROR" || tipoRight == "ERROR") return "ERROR";
+
+                    bool esMas = opToken == "MAS" || opLexema == "+" || opToken == "OA1";
+                    if (esMas)
+                    {
+                        // permitir concatenación CAD + CAD o CAD + num (resulta CAD)
+                        if (tipoLeft == "CAD" && (tipoRight == "CAD" || EsNumerico(tipoRight)))
+                        {
+                            tipoLeft = "CAD";
+                            continue;
+                        }
+                        // suma numérica
+                        if (EsNumerico(tipoLeft) && EsNumerico(tipoRight))
+                        {
+                            tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
+                            continue;
+                        }
+
+                        Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
+                        return "ERROR";
+                    }
+
+                    // otros operadores requieren operandos numéricos
                     if (!EsNumerico(tipoLeft) || !EsNumerico(tipoRight))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
                         return "ERROR";
                     }
+
                     tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                 }
 
@@ -959,7 +1033,31 @@
         private bool EsID(string token) => token != null && token.StartsWith("IDV");
         private bool EsCN(string token) => token == "CNU" || token == "CNR";
         private bool EsOL(string token) => token == "OL1" || token == "OL2" || token == "OL3";
-        private bool EsOR(string token) => token == "OR1" || token == "OR2" || token == "OR3" || token == "OR4" || token == "OR5" || token == "OR6";
+        private bool EsOR(string token)
+        {
+            if (string.IsNullOrEmpty(token)) return false;
+            // tokens from DB like OR1..OR6
+            if (token.StartsWith("OR")) return true;
+
+            // also accept common relational symbol token names produced by the lexer/BD
+            switch (token)
+            {
+                case "MAYOR":
+                case "MENOR":
+                case "IGUAL":
+                case "MAYOR_IGUAL":
+                case "MENOR_IGUAL":
+                case "DISTINTO":
+                case ">=":
+                case "<=":
+                case "<>":
+                case ">":
+                case "<":
+                    return true;
+                default:
+                    return false;
+            }
+        }
         private bool EsOA(string token) =>
             token == "OA1" || token == "OA2" || token == "OA3" || token == "OA4" || token == "OA5"
             || token == "MAS" || token == "MENOS" || token == "ASTERISCO" || token == "SLASH";

@@ -290,7 +290,6 @@
             Consumir("CD1", "Se esperaba '{' para abrir bloque 'mientras'");
             ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque 'mientras'");
-            Consumir("CD5", "Se esperaba ';' al final de 'mientras'");
             Pasos.Add("[PR9] mientras reconocido ✔");
         }
 
@@ -394,7 +393,11 @@
             else if (EsOR(opSiguiente))
                 ParseOPR();
             else
-                Error($"Se esperaba operador lógico o relacional en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
+            {
+                // No operator: allow a single ARG7 (e.g., 'si (x)') syntactically.
+                // Semantic analyzer will validate that the result is boolean.
+                ParseARG7();
+            }
         }
 
         private void ParseOPL()
