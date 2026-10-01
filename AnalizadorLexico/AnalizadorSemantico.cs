@@ -6,9 +6,15 @@
         private int _pos;
         private int _ultimaLineaConsumida = 0;
         private Dictionary<string, Simbolo> _tablaSimbolos = new();
+        // Simple stack-based memory model
+        private int _stackPointer = 0; // next free address (bytes)
+        private Stack<int> _scopeStack = new(); // saved stack pointers per scope
+        private Stack<List<string>> _symbolsPerScope = new(); // symbols allocated per scope
         public List<string> Errores { get; private set; } = new();
         public List<string> DebugLog { get; private set; } = new();
         public List<Simbolo> TablaSimbolosFinal { get; private set; } = new();
+        // Optional AST produced by the parser; analyzer can use it in future extensions
+        public ProgramNode? AstRoot { get; set; }
 
         private (int linea, string valor, string token) TokenActual => _pos < _tokens.Count ? _tokens[_pos] : (-1, "EOF", "EOF");
 
@@ -22,6 +28,9 @@
             DebugLog.Add("Analizar: inicio");
             _tablaSimbolos.Clear();
             TablaSimbolosFinal.Clear();
+
+            // start global scope
+            EnterScope();
 
             try
             {
@@ -84,18 +93,43 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            string valor = TokenActual.valor;
-            if (TokenActual.token != "CNU")
+            // aceptar inicializador: constante entera o identificador de tipo ENT
+            if (TokenActual.token == "CNU")
             {
-                Error($"Se esperaba constante entera (CNU) en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
+                string valor = TokenActual.valor;
+                Consumir("CNU", "Se esperaba constante entera");
+                Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
+                RegistrarSimbolo(id, "ENT", valor, lineaDeclaracion);
+                return;
+            }
+            else if (EsID(TokenActual.token))
+            {
+                string idInit = TokenActual.valor;
+                Consumir(TokenActual.token, "Se esperaba identificador como inicializador");
+                if (!_tablaSimbolos.ContainsKey(idInit))
+                {
+                    Error($"Variable '{idInit}' no declarada en línea {TokenActual.linea}");
+                    SkipToEndOfStatement();
+                    return;
+                }
+                // inicializador debe ser ENT (no permitir DEC -> ENT implicitamente)
+                string tipoInit = _tablaSimbolos[idInit].Tipo;
+                if (tipoInit != "ENT")
+                {
+                    Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {TokenActual.linea}");
+                    SkipToEndOfStatement();
+                    return;
+                }
+                Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
+                RegistrarSimbolo(id, "ENT", idInit, lineaDeclaracion);
+                return;
+            }
+            else
+            {
+                Error($"Se esperaba constante entera o identificador en declaración ENT en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
                 SkipToEndOfStatement();
                 return;
             }
-            Consumir("CNU", "Se esperaba constante entera");
-
-            Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
-
-            RegistrarSimbolo(id, "ENT", valor, lineaDeclaracion);
         }
 
         private void ParseDeclaracionDEC()
@@ -113,18 +147,42 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            string valor = TokenActual.valor;
-            if (TokenActual.token != "CNR")
+            // aceptar inicializador: constante numérica (CNR/CNU) o identificador numérico
+            if (TokenActual.token == "CNR" || TokenActual.token == "CNU")
             {
-                Error($"Se esperaba constante real (CNR) en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
+                string valor = TokenActual.valor;
+                Consumir(TokenActual.token, "Se esperaba constante numérica");
+                Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
+                RegistrarSimbolo(id, "DEC", valor, lineaDeclaracion);
+                return;
+            }
+            else if (EsID(TokenActual.token))
+            {
+                string idInit = TokenActual.valor;
+                Consumir(TokenActual.token, "Se esperaba identificador como inicializador");
+                if (!_tablaSimbolos.ContainsKey(idInit))
+                {
+                    Error($"Variable '{idInit}' no declarada en línea {TokenActual.linea}");
+                    SkipToEndOfStatement();
+                    return;
+                }
+                string tipoInit = _tablaSimbolos[idInit].Tipo;
+                if (!EsNumerico(tipoInit))
+                {
+                    Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {TokenActual.linea}");
+                    SkipToEndOfStatement();
+                    return;
+                }
+                Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
+                RegistrarSimbolo(id, "DEC", idInit, lineaDeclaracion);
+                return;
+            }
+            else
+            {
+                Error($"Se esperaba constante numérica o identificador en declaración DEC en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
                 SkipToEndOfStatement();
                 return;
             }
-            Consumir("CNR", "Se esperaba constante real");
-
-            Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
-
-            RegistrarSimbolo(id, "DEC", valor, lineaDeclaracion);
         }
 
         private void ParseDeclaracionCAD()
@@ -446,8 +504,12 @@
         private void ParseBloque()
         {
             DebugLog.Add($"ParseBloque at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
+            // enter a new scope for this block
+            EnterScope();
             while (TokenActual.token != "CD2" && TokenActual.token != "EOF")
                 ParseS();
+            // exit block scope and free its symbols
+            ExitScope();
         }
 
         private string ParseCondic()
@@ -797,14 +859,88 @@
                 return;
             }
 
-            _tablaSimbolos[id] = new Simbolo
+            int size = SizeOfType(tipo);
+            int address = _stackPointer;
+            _stackPointer += size;
+
+            var simbolo = new Simbolo
             {
                 Id = _tablaSimbolos.Count + 1,
                 Nombre = id,
                 Tipo = tipo,
                 Valor = valor,
-                Linea = linea
+                Linea = linea,
+                Address = address,
+                Size = size
             };
+
+            _tablaSimbolos[id] = simbolo;
+
+            // record allocation in current scope so it can be freed on ExitScope
+            if (_symbolsPerScope.Count > 0)
+                _symbolsPerScope.Peek().Add(id);
+
+            DebugLog.Add($"RegistrarSimbolo: '{id}' tipo={tipo} addr={address} size={size} line={linea}");
+
+            // annotate AST declaration node if available
+            AnnotateDeclarationInAst(id, address, size);
+        }
+
+        private int SizeOfType(string tipo)
+        {
+            return tipo switch
+            {
+                "ENT" => 4,
+                "DEC" => 8,
+                "CAD" => 8, // store pointer/handle for string
+                _ => 4
+            };
+        }
+
+        private void AnnotateDeclarationInAst(string id, int address, int size)
+        {
+            if (AstRoot == null) return;
+
+            foreach (var stmt in AstRoot.Statements.OfType<DeclarationNode>())
+            {
+                if (stmt.Identificador == id && stmt.MemoryAddress == null)
+                {
+                    stmt.MemoryAddress = address;
+                    stmt.Size = size;
+                    DebugLog.Add($"AST annotated: decl {id} -> addr={address} size={size}");
+                    return;
+                }
+            }
+        }
+
+        private void EnterScope()
+        {
+            DebugLog.Add($"EnterScope: sp={_stackPointer}");
+            _scopeStack.Push(_stackPointer);
+            _symbolsPerScope.Push(new List<string>());
+        }
+
+        private void ExitScope()
+        {
+            DebugLog.Add($"ExitScope: sp={_stackPointer}");
+            if (_symbolsPerScope.Count > 0)
+            {
+                var symbols = _symbolsPerScope.Pop();
+                foreach (var name in symbols)
+                {
+                    if (_tablaSimbolos.ContainsKey(name))
+                    {
+                        DebugLog.Add($"Free symbol: {name}");
+                        _tablaSimbolos.Remove(name);
+                    }
+                }
+            }
+
+            if (_scopeStack.Count > 0)
+            {
+                _stackPointer = _scopeStack.Pop();
+                DebugLog.Add($"Restore sp={_stackPointer}");
+            }
         }
 
         private bool TiposCompatibles(string tipo1, string tipo2)
@@ -904,5 +1040,8 @@
         public string Tipo { get; set; } = "";
         public string Valor { get; set; } = "";
         public int Linea { get; set; }
+        // Memory info
+        public int Address { get; set; }
+        public int Size { get; set; }
     }
 }

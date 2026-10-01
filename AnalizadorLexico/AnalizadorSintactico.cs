@@ -8,6 +8,7 @@
         public List<string> Pasos { get; private set; } = new();
         public List<string> Errores { get; private set; } = new();
         public bool EsValido => Errores.Count == 0;
+        public ProgramNode AstRoot { get; private set; } = new ProgramNode();
         private (int linea, string valor, string token) TokenActual => _pos < _tokens.Count ? _tokens[_pos] : (-1, "EOF", "EOF");
         public bool Analizar(List<(int linea, string valor, string token)> tokens)
         {
@@ -16,6 +17,7 @@
             _ultimaLineaConsumida = 0;
             Pasos.Clear();
             Errores.Clear();
+            AstRoot = new ProgramNode();
 
             Pasos.Add("=== INICIO DEL ANÁLISIS SINTÁCTICO ===");
 
@@ -63,12 +65,36 @@
         {
             Pasos.Add("[ENT] Declaración entera...");
             Consumir("ENT", "Se esperaba 'ENT'");
-            ParseARG1();
+            string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            // Sintaxis: aceptar cualquier expresión válida aquí; la comprobación de tipos
-            // debe realizarla el analizador semántico.
-            ParseARG2();
+            // Build a simple AST node for the right-hand side when possible
+            var valorNode = BuildSimpleExprNode();
+            if (valorNode == null)
+            {
+                // fallback: consume the expression syntactically
+                ParseARG2();
+            }
+            else
+            {
+                // If an operator follows the simple node, consume the remaining operator+operand chain.
+                // If a '(' follows, that indicates a full parenthesized expression; use ParseOPA.
+                if (EsOA(TokenActual.token))
+                {
+                    ParseOPARest();
+                    // we don't build a complex expression AST here; clear simple node
+                    valorNode = null;
+                }
+                else if (TokenActual.token == "CD3")
+                {
+                    // parenthesis indicates a full expression starting here
+                    ParseOPA();
+                    valorNode = null;
+                }
+            }
             Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
+            // register AST node
+            var decl = new DeclarationNode { Tipo = "ENT", Identificador = id, Valor = valorNode };
+            AstRoot.Statements.Add(decl);
             Pasos.Add("[ENT] Declaración reconocida ✔");
         }
 
@@ -76,11 +102,28 @@
         {
             Pasos.Add("[DEC] Declaración decimal...");
             Consumir("DEC", "Se esperaba 'DEC'");
-            ParseARG1();
+            string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
             // Aceptar cualquier expresión; la semántica comprobará que sea numérica
-            ParseARG2();
+            var valorNode = BuildSimpleExprNode();
+            if (valorNode == null)
+                ParseARG2();
+            else
+            {
+                if (EsOA(TokenActual.token))
+                {
+                    ParseOPARest();
+                    valorNode = null;
+                }
+                else if (TokenActual.token == "CD3")
+                {
+                    ParseOPA();
+                    valorNode = null;
+                }
+            }
             Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
+            var decl = new DeclarationNode { Tipo = "DEC", Identificador = id, Valor = valorNode };
+            AstRoot.Statements.Add(decl);
             Pasos.Add("[DEC] Declaración reconocida ✔");
         }
 
@@ -88,21 +131,55 @@
         {
             Pasos.Add("[CAD] Declaración cadena...");
             Consumir("CAD", "Se esperaba 'CAD'");
-            ParseARG1();
+            string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
             // Dejar que el analizador semántico valide que aquí vaya una cadena si procede
-            ParseARG2();
+            var valorNode = BuildSimpleExprNode();
+            if (valorNode == null)
+                ParseARG2();
+            else
+            {
+                if (EsOA(TokenActual.token))
+                {
+                    ParseOPARest();
+                    valorNode = null;
+                }
+                else if (TokenActual.token == "CD3")
+                {
+                    ParseOPA();
+                    valorNode = null;
+                }
+            }
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
+            var decl = new DeclarationNode { Tipo = "CAD", Identificador = id, Valor = valorNode };
+            AstRoot.Statements.Add(decl);
             Pasos.Add("[CAD] Declaración reconocida ✔");
         }
  
         private void ParseAsignacion()
         {
             Pasos.Add($"[ASIG] Asignación a '{TokenActual.valor}'...");
-            ParseARG1();
+            string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' en asignación");
-            ParseARG2();
+            var valorNode = BuildSimpleExprNode();
+            if (valorNode == null)
+                ParseARG2();
+            else
+            {
+                if (EsOA(TokenActual.token))
+                {
+                    ParseOPARest();
+                    valorNode = null;
+                }
+                else if (TokenActual.token == "CD3")
+                {
+                    ParseOPA();
+                    valorNode = null;
+                }
+            }
             Consumir("CD5", "Se esperaba ';' al final de asignación");
+            var assign = new AssignmentNode { Identificador = id, Valor = valorNode };
+            AstRoot.Statements.Add(assign);
             Pasos.Add("[ASIG] Asignación reconocida ✔");
         }
 
@@ -442,32 +519,148 @@
                 Error($"Se esperaba identificador (ARG1) en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
         }
 
+        private string LeerIdentificador()
+        {
+            if (EsID(TokenActual.token))
+            {
+                string id = TokenActual.valor;
+                Pasos.Add($"[ID] '{id}' ({TokenActual.token}) línea {TokenActual.linea}");
+                Avanzar();
+                return id;
+            }
+            Error($"Se esperaba identificador (ARG1) en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
+            return "";
+        }
+
+        private AstNode? BuildSimpleExprNode()
+        {
+            // Try to build a literal or identifier node for simple RHS expressions
+            if (TokenActual.token == "CAD")
+            {
+                var node = new LiteralNode { TipoLiteral = "CAD", Valor = TokenActual.valor };
+                Avanzar();
+                return node;
+            }
+            if (EsCN(TokenActual.token))
+            {
+                var tipoLit = TokenActual.token == "CNU" ? "CNU" : "CNR";
+                var node = new LiteralNode { TipoLiteral = tipoLit, Valor = TokenActual.valor };
+                Avanzar();
+                return node;
+            }
+            if (EsID(TokenActual.token))
+            {
+                var node = new IdentifierNode { Nombre = TokenActual.valor };
+                Avanzar();
+                return node;
+            }
+            // Parenthesized or complex expression: leave to existing ParseARG2/OPA logic
+            if (TokenActual.token == "CD3")
+                return null;
+
+            return null;
+        }
+
         private void ParseOPA()
         {
             Pasos.Add("[OPA] Operación aritmética...");
 
+            // If expression starts with '(', parse the parenthesized expression first
             if (TokenActual.token == "CD3")
             {
                 Consumir("CD3", "Se esperaba '('");
                 ParseOPA();
                 Consumir("CD4", "Se esperaba ')' después de OPA");
+                // after a parenthesized expression there may follow operators
             }
             else
             {
+                // left operand
                 ParseARG4();
-                if (EsOA(TokenActual.token))
+            }
+
+            // consume zero or more (operator operand) pairs to allow chains like a + b * 2 - 1
+            while (EsOA(TokenActual.token))
+            {
+                Pasos.Add($"[OA] '{TokenActual.valor}' ({TokenActual.token})");
+                Avanzar();
+                // right operand can be a parenthesized expression or a simple arg
+                if (TokenActual.token == "CD3")
                 {
-                    Pasos.Add($"[OA] '{TokenActual.valor}' ({TokenActual.token})");
-                    Avanzar();
+                    Consumir("CD3", "Se esperaba '('");
+                    ParseOPA();
+                    Consumir("CD4", "Se esperaba ')' después de OPA");
+                }
+                else
+                {
                     ParseARG4();
                 }
             }
+
             Pasos.Add("[OPA] Operación aritmética reconocida ✔");
+        }
+
+        // Consume operator + operand pairs assuming left operand was already parsed/consumed
+        private void ParseOPARest()
+        {
+            while (EsOA(TokenActual.token))
+            {
+                Pasos.Add($"[OPA-REST] '{TokenActual.valor}' ({TokenActual.token})");
+                Avanzar();
+                if (TokenActual.token == "CD3")
+                {
+                    Consumir("CD3", "Se esperaba '('");
+                    ParseOPA();
+                    Consumir("CD4", "Se esperaba ')' después de OPA");
+                }
+                else
+                {
+                    ParseARG4();
+                }
+            }
+            Pasos.Add("[OPA-REST] Operación aritmética reconocida ✔");
         }
 
         private void ParseARG4()
         {
             Pasos.Add($"[ARG4] token: {TokenActual.token}");
+            // Recover from cases where an operator appears where an operand is expected
+            if (EsOA(TokenActual.token))
+            {
+                // Support unary + and - (e.g. +1, -x)
+                if (TokenActual.token == "MAS" || TokenActual.token == "MENOS")
+                {
+                    Pasos.Add($"[ARG4] unary '{TokenActual.valor}'");
+                    Avanzar();
+                    if (TokenActual.token == "CD3")
+                    {
+                        Consumir("CD3", "Se esperaba '('");
+                        ParseOPA();
+                        Consumir("CD4", "Se esperaba ')' después de OPA");
+                        return;
+                    }
+                    else if (EsID(TokenActual.token)) { ParseID(); return; }
+                    else if (EsCN(TokenActual.token)) { ParseCN(); return; }
+                    else if (EsCadeLiteral(TokenActual.token)) { Pasos.Add($"[ARG4] Literal cadena: '{TokenActual.valor}'"); Avanzar(); return; }
+                    else { Error($"Se esperaba identificador, número, cadena o expresión aritmética en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'"); return; }
+                }
+
+                // Other operators at this position are unexpected: report and attempt to recover by skipping it
+                Error($"Se esperaba identificador, número, cadena o expresión aritmética en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
+                Avanzar();
+                // try to continue by parsing the next token as ARG4
+                if (TokenActual.token == "CD3")
+                {
+                    Consumir("CD3", "Se esperaba '('");
+                    ParseOPA();
+                    Consumir("CD4", "Se esperaba ')' después de OPA");
+                    return;
+                }
+                else if (EsID(TokenActual.token)) { ParseID(); return; }
+                else if (EsCN(TokenActual.token)) { ParseCN(); return; }
+                else if (EsCadeLiteral(TokenActual.token)) { Pasos.Add($"[ARG4] Literal cadena: '{TokenActual.valor}'"); Avanzar(); return; }
+                else return;
+            }
 
             if (TokenActual.token == "CD3")
             {
@@ -534,7 +727,8 @@
         private bool EsOR(string token) => token == "OR1" || token == "OR2" || token == "OR3"
                                                   || token == "OR4" || token == "OR5" || token == "OR6";
         private bool EsOA(string token) => token == "OA1" || token == "OA2" || token == "OA3"
-                                                  || token == "OA4" || token == "OA5";
+                                                  || token == "OA4" || token == "OA5"
+                                                  || token == "MAS" || token == "MENOS" || token == "ASTERISCO" || token == "SLASH";
         private bool EsCadeLiteral(string token) => token == "CAD";
 
         private void AvanzarARG7Lookahead(ref int pos)

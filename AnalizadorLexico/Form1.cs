@@ -320,7 +320,8 @@ namespace AnalizadorLexico
                     simbolo.Id,
                     simbolo.Nombre,
                     simbolo.Tipo,
-                    simbolo.Valor
+                    simbolo.Valor,
+                    simbolo.Address
                 );
             }
 
