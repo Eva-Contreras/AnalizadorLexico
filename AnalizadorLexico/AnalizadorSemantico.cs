@@ -6,8 +6,7 @@
         private int _pos;
         private int _ultimaLineaConsumida = 0;
         private Dictionary<(int ambitoId, string nombre), Simbolo> _tablaSimbolos = new();
-        // Simple stack-based memory model
-        private int _stackPointer = 0; // next free address (bytes)
+        private int _stackPointer = 0; 
         private Stack<Ambito> _ambitos = new();
         private Ambito? _ambitoActual;
         private int _siguienteIdAmbito;
@@ -15,7 +14,6 @@
         public List<string> Errores { get; private set; } = new();
         public List<string> DebugLog { get; private set; } = new();
         public List<Simbolo> TablaSimbolosFinal { get; private set; } = new();
-        // Optional AST produced by the parser; analyzer can use it in future extensions
         public ProgramNode? AstRoot { get; set; }
 
         private (int linea, string valor, string token) TokenActual => _pos < _tokens.Count ? _tokens[_pos] : (-1, "EOF", "EOF");
@@ -36,7 +34,6 @@
             _siguienteIdSimbolo = 0;
             _stackPointer = 0;
 
-            // start global scope
             EnterScope();
 
             try
@@ -98,29 +95,25 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // Guardar token inicial para potencial valor literal/identificador
             string tokenInicio = TokenActual.token;
             string valorInicio = TokenActual.valor;
 
-            // Parsear cualquier expresión/valor válido en RHS
             string tipoInit = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
 
             if (tipoInit == "ERROR") return;
 
-            // inicializador debe ser ENT (no permitir DEC -> ENT implicitamente)
             if (tipoInit != "ENT")
             {
                 Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {TokenActual.linea}");
                 return;
             }
 
-            // Determinar valor a registrar cuando sea literal o identificador
             string valorRegistrar = "";
-            if (tokenInicio == "CNU") // constante entera literal
+            if (tokenInicio == "CNU") 
                 valorRegistrar = valorInicio;
-            else if (EsID(tokenInicio)) // identificador: registrar el nombre (como antes)
+            else if (EsID(tokenInicio)) 
                 valorRegistrar = valorInicio;
 
             RegistrarSimbolo(id, "ENT", valorRegistrar, lineaDeclaracion);
@@ -141,11 +134,9 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // Guardar token inicial para potencial valor literal/identificador
             string tokenInicio = TokenActual.token;
             string valorInicio = TokenActual.valor;
 
-            // Aceptar expresión numérica (constante, identificador o expresión aritmética)
             string tipoInit = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
@@ -159,7 +150,7 @@
             }
 
             string valorRegistrar = "";
-            if (tokenInicio == "CNU" || tokenInicio == "CNR") // constante numérica literal
+            if (tokenInicio == "CNU" || tokenInicio == "CNR")
                 valorRegistrar = valorInicio;
             else if (EsID(tokenInicio))
                 valorRegistrar = valorInicio;
@@ -182,11 +173,9 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // Guardar token inicial para posible literal o identificador
             string tokenInicio = TokenActual.token;
             string valorInicio = TokenActual.valor;
 
-            // Permitir expresiones de tipo cadena (usar el parser existente)
             string tipoInit = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
@@ -199,7 +188,6 @@
                 return;
             }
 
-            // Registrar valor si es literal o identificador con valor conocido
             string valorRegistrar = "";
             if (tokenInicio == "CAD")
             {
@@ -228,7 +216,6 @@
 
             Consumir("OPA", "Se esperaba '=' en asignación");
 
-            // Guardar token inicial para posible valor literal/identificador
             string tokenInicio = TokenActual.token;
             string valorInicio = TokenActual.valor;
 
@@ -249,7 +236,6 @@
                 return;
             }
 
-            // Si RHS fue un literal o un identificador con valor conocido, actualizar el valor en la tabla
             if (tipoRHS != "ERROR")
             {
                 string valorRegistrar = "";
@@ -264,7 +250,6 @@
                     if (simInit != null)
                     {
                         valorRegistrar = simInit.Valor ?? "";
-                        // si queremos almacenar el nombre del identificador en lugar del valor, usar idInit
                     }
                 }
 
@@ -533,29 +518,23 @@
         private void ParseBloque()
         {
             DebugLog.Add($"ParseBloque at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
-            // enter a new scope for this block
             EnterScope();
             while (TokenActual.token != "CD2" && TokenActual.token != "EOF")
                 ParseS();
-            // exit block scope and free its symbols
             ExitScope();
         }
 
         private string ParseCondic()
         {
-            // Always try parsing a logical expression sequence.
-            // Each logical operator connects full comparisons/conditions.
             return ParseOPL();
         }
 
         private string ParseOPL()
         {
-            // Parse first condition (which can be a relational expression or boolean atom)
             string tipoIzquierdo = ParseCondicionBase();
             bool tieneOperadorLogico = false;
             bool hayError = tipoIzquierdo == "ERROR";
 
-            // Allow chained logical operators: cond (OL cond)*
             while (EsOLBinario(TokenActual.token))
             {
                 tieneOperadorLogico = true;
@@ -574,7 +553,6 @@
                     hayError = true;
                 }
 
-                // result of logical operation is boolean
                 tipoIzquierdo = "BOOL";
             }
 
@@ -602,9 +580,6 @@
             int posTemp = _pos;
             AvanzarARG7Lookahead(ref posTemp);
             string operador = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
-
-            // If a relational operator follows the first operand, parse a relational operation;
-            // otherwise parse a single ARG7 (which may be a parenthesized subcondition).
             return EsOR(operador) ? ParseOPR() : ParseARG7();
         }
 
@@ -635,8 +610,6 @@
             if (TokenActual.token == "CD3")
             {
                 Consumir("CD3", "Se esperaba '('");
-                // When a parenthesized group is found, parse the whole internal condition
-                // (which may be logical, relational or arithmetic depending on content).
                 string tipoResultado = ParseCondic();
                 Consumir("CD4", "Se esperaba ')' para cerrar ARG7");
                 return tipoResultado;
@@ -661,14 +634,12 @@
                 string tipoLeft = simbolo.Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    // Capturamos el operador actual antes de consumir/avanzar
                     string opToken = TokenActual.token;
                     string opLexema = TokenActual.valor;
-                    Avanzar(); // consumir el operador
+                    Avanzar(); 
                     string tipoRight = ParseARG4();
                     if (tipoLeft == "ERROR" || tipoRight == "ERROR") return "ERROR";
 
-                    // Si el operador es '+' permitimos concatenación de CAD o suma numérica
                     bool esMas = opToken == "MAS" || opLexema == "+" || opToken == "OA1";
                     if (esMas)
                     {
@@ -682,12 +653,10 @@
                             tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                             continue;
                         }
-                        // mezcla inválida con '+'
                         Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
                         return "ERROR";
                     }
 
-                    // Para los demás operadores, exigir operandos numéricos
                     if (!EsNumerico(tipoLeft) || !EsNumerico(tipoRight))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
@@ -756,7 +725,6 @@
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
                     {
-                        // skip operator and rhs to recover
                         Avanzar();
                         ParseARG4();
                     }
@@ -766,7 +734,6 @@
                 string tipoLeft = simbolo.Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    // capture operator before consuming
                     string opToken = TokenActual.token;
                     string opLexema = TokenActual.valor;
                     Consumir(TokenActual.token, "Se esperaba operador aritmético");
@@ -777,13 +744,11 @@
                     bool esMas = opToken == "MAS" || opLexema == "+" || opToken == "OA1";
                     if (esMas)
                     {
-                        // permitir concatenación CAD + CAD o CAD + num (resulta CAD)
                         if (tipoLeft == "CAD" && (tipoRight == "CAD" || EsNumerico(tipoRight)))
                         {
                             tipoLeft = "CAD";
                             continue;
                         }
-                        // suma numérica
                         if (EsNumerico(tipoLeft) && EsNumerico(tipoRight))
                         {
                             tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
@@ -794,7 +759,6 @@
                         return "ERROR";
                     }
 
-                    // otros operadores requieren operandos numéricos
                     if (!EsNumerico(tipoLeft) || !EsNumerico(tipoRight))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
@@ -981,12 +945,10 @@
             _tablaSimbolos[(_ambitoActual?.Id ?? 0, id)] = simbolo;
             TablaSimbolosFinal.Add(simbolo);
 
-            // record allocation in current scope so it can be freed on ExitScope
             _ambitoActual?.Simbolos.Add(id);
 
             DebugLog.Add($"RegistrarSimbolo: '{id}' tipo={tipo} addr={address} size={size} line={linea}");
 
-            // annotate AST declaration node if available
             AnnotateDeclarationInAst(id, address, size);
         }
 
@@ -996,7 +958,7 @@
             {
                 "ENT" => 4,
                 "DEC" => 8,
-                "CAD" => 8, // store pointer/handle for string
+                "CAD" => 8, 
                 _ => 4
             };
         }
@@ -1093,10 +1055,8 @@
         private bool EsOR(string token)
         {
             if (string.IsNullOrEmpty(token)) return false;
-            // tokens from DB like OR1..OR6
             if (token.StartsWith("OR")) return true;
 
-            // also accept common relational symbol token names produced by the lexer/BD
             switch (token)
             {
                 case "MAYOR":
@@ -1195,7 +1155,6 @@
         public string Tipo { get; set; } = "";
         public string Valor { get; set; } = "";
         public int Linea { get; set; }
-        // Memory info
         public int Address { get; set; }
         public int Size { get; set; }
         public string Ambito { get; set; } = "Global";
