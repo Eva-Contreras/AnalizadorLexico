@@ -5,11 +5,13 @@
         private List<(int linea, string valor, string token)> _tokens = new();
         private int _pos;
         private int _ultimaLineaConsumida = 0;
-        private Dictionary<string, Simbolo> _tablaSimbolos = new();
+        private Dictionary<(int ambitoId, string nombre), Simbolo> _tablaSimbolos = new();
         // Simple stack-based memory model
         private int _stackPointer = 0; // next free address (bytes)
-        private Stack<int> _scopeStack = new(); // saved stack pointers per scope
-        private Stack<List<string>> _symbolsPerScope = new(); // symbols allocated per scope
+        private Stack<Ambito> _ambitos = new();
+        private Ambito? _ambitoActual;
+        private int _siguienteIdAmbito;
+        private int _siguienteIdSimbolo;
         public List<string> Errores { get; private set; } = new();
         public List<string> DebugLog { get; private set; } = new();
         public List<Simbolo> TablaSimbolosFinal { get; private set; } = new();
@@ -28,6 +30,11 @@
             DebugLog.Add("Analizar: inicio");
             _tablaSimbolos.Clear();
             TablaSimbolosFinal.Clear();
+            _ambitos.Clear();
+            _ambitoActual = null;
+            _siguienteIdAmbito = 0;
+            _siguienteIdSimbolo = 0;
+            _stackPointer = 0;
 
             // start global scope
             EnterScope();
@@ -36,8 +43,6 @@
             {
                 while (TokenActual.token != "EOF")
                     ParseS();
-
-                TablaSimbolosFinal = _tablaSimbolos.Values.ToList();
 
                 return Errores.Count == 0;
             }
@@ -202,8 +207,9 @@
             }
             else if (EsID(tokenInicio))
             {
-                if (_tablaSimbolos.TryGetValue(valorInicio, out var sim))
-                    valorRegistrar = sim.Valor ?? "";
+                var simboloInicial = BuscarSimbolo(valorInicio);
+                if (simboloInicial != null)
+                    valorRegistrar = simboloInicial.Valor ?? "";
             }
 
             RegistrarSimbolo(id, "CAD", valorRegistrar, lineaDeclaracion);
@@ -230,13 +236,13 @@
 
             Consumir("CD5", "Se esperaba ';' al final de asignación");
 
-            if (!_tablaSimbolos.ContainsKey(id))
+            var simbolo = BuscarSimbolo(id);
+            if (simbolo == null)
             {
                 Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                 return;
             }
 
-            var simbolo = _tablaSimbolos[id];
             if (!TiposCompatibles(simbolo.Tipo, tipoRHS))
             {
                 Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {TokenActual.linea}");
@@ -254,7 +260,8 @@
                 else if (EsID(tokenInicio))
                 {
                     string idInit = valorInicio;
-                    if (_tablaSimbolos.TryGetValue(idInit, out var simInit))
+                    var simInit = BuscarSimbolo(idInit);
+                    if (simInit != null)
                     {
                         valorRegistrar = simInit.Valor ?? "";
                         // si queremos almacenar el nombre del identificador en lugar del valor, usar idInit
@@ -262,7 +269,7 @@
                 }
 
                 if (!string.IsNullOrEmpty(valorRegistrar))
-                    _tablaSimbolos[id].Valor = valorRegistrar;
+                    simbolo.Valor = valorRegistrar;
             }
         }
 
@@ -283,7 +290,7 @@
             Consumir("CD4", "Se esperaba ')' en 'leer'");
             Consumir("CD5", "Se esperaba ';' al final de 'leer'");
 
-            if (!_tablaSimbolos.ContainsKey(id))
+            if (BuscarSimbolo(id) == null)
             {
                 Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
             }
@@ -448,7 +455,7 @@
 
             Consumir("CD5", "Se esperaba ';' después de inicialización en 'para'");
 
-            if (!_tablaSimbolos.ContainsKey(id))
+            if (BuscarSimbolo(id) == null)
                 RegistrarSimbolo(id, "ENT", initValor, lineaDeclaracion);
 
             string tipoCond = ParseCondic();
@@ -470,11 +477,12 @@
 
             if (tipoIncremento != "ERROR")
             {
-                if (!_tablaSimbolos.ContainsKey(idIncremento))
+                var simboloIncremento = BuscarSimbolo(idIncremento);
+                if (simboloIncremento == null)
                 {
                     Error($"Variable '{idIncremento}' no declarada en 'para' en línea {TokenActual.linea}");
                 }
-                else if (!TiposCompatibles(_tablaSimbolos[idIncremento].Tipo, tipoIncremento))
+                else if (!TiposCompatibles(simboloIncremento.Tipo, tipoIncremento))
                 {
                     Error($"Tipo incompatible en incremento de 'para' en línea {TokenActual.linea}");
                 }
@@ -638,7 +646,8 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                var simbolo = BuscarSimbolo(id);
+                if (simbolo == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
@@ -649,7 +658,7 @@
                     return "ERROR";
                 }
 
-                string tipoLeft = _tablaSimbolos[id].Tipo;
+                string tipoLeft = simbolo.Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
                     // Capturamos el operador actual antes de consumir/avanzar
@@ -741,7 +750,8 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                var simbolo = BuscarSimbolo(id);
+                if (simbolo == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
@@ -753,7 +763,7 @@
                     return "ERROR";
                 }
 
-                string tipoLeft = _tablaSimbolos[id].Tipo;
+                string tipoLeft = simbolo.Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
                     // capture operator before consuming
@@ -848,7 +858,7 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                if (BuscarSimbolo(id) == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                 }
@@ -914,7 +924,8 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                var simbolo = BuscarSimbolo(id);
+                if (simbolo == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     int posTemp = _pos;
@@ -922,7 +933,7 @@
                         ParseOPA();
                     return "ERROR";
                 }
-                return _tablaSimbolos[id].Tipo;
+                return simbolo.Tipo;
             }
             else if (EsCN(TokenActual.token))
             {
@@ -945,7 +956,7 @@
 
         private void RegistrarSimbolo(string id, string tipo, string valor, int linea)
         {
-            if (_tablaSimbolos.ContainsKey(id))
+            if (_ambitoActual != null && _tablaSimbolos.ContainsKey((_ambitoActual.Id, id)))
             {
                 Error($"Variable '{id}' ya declarada en línea {linea}");
                 return;
@@ -957,20 +968,21 @@
 
             var simbolo = new Simbolo
             {
-                Id = _tablaSimbolos.Count + 1,
+                Id = ++_siguienteIdSimbolo,
                 Nombre = id,
                 Tipo = tipo,
                 Valor = valor,
                 Linea = linea,
                 Address = address,
-                Size = size
+                Size = size,
+                Ambito = _ambitoActual?.Padre is null ? "Global" : "Local"
             };
 
-            _tablaSimbolos[id] = simbolo;
+            _tablaSimbolos[(_ambitoActual?.Id ?? 0, id)] = simbolo;
+            TablaSimbolosFinal.Add(simbolo);
 
             // record allocation in current scope so it can be freed on ExitScope
-            if (_symbolsPerScope.Count > 0)
-                _symbolsPerScope.Peek().Add(id);
+            _ambitoActual?.Simbolos.Add(id);
 
             DebugLog.Add($"RegistrarSimbolo: '{id}' tipo={tipo} addr={address} size={size} line={linea}");
 
@@ -1007,32 +1019,58 @@
 
         private void EnterScope()
         {
-            DebugLog.Add($"EnterScope: sp={_stackPointer}");
-            _scopeStack.Push(_stackPointer);
-            _symbolsPerScope.Push(new List<string>());
+            int id = ++_siguienteIdAmbito;
+            var ambito = new Ambito
+            {
+                Id = id,
+                NombreCompleto = _ambitoActual == null
+                    ? "Global"
+                    : $"{_ambitoActual.NombreCompleto}/Bloque{id}",
+                Padre = _ambitoActual,
+                StackPointerGuardado = _stackPointer
+            };
+            _ambitos.Push(ambito);
+            _ambitoActual = ambito;
+            DebugLog.Add($"EnterScope: {_ambitoActual.NombreCompleto}, sp={_stackPointer}");
         }
 
         private void ExitScope()
         {
-            DebugLog.Add($"ExitScope: sp={_stackPointer}");
-            if (_symbolsPerScope.Count > 0)
+            if (_ambitos.Count > 0)
             {
-                var symbols = _symbolsPerScope.Pop();
-                foreach (var name in symbols)
+                var ambito = _ambitos.Pop();
+                DebugLog.Add($"ExitScope: {ambito.NombreCompleto}, sp={_stackPointer}");
+                foreach (var name in ambito.Simbolos)
                 {
-                    if (_tablaSimbolos.ContainsKey(name))
+                    if (_tablaSimbolos.Remove((ambito.Id, name)))
                     {
                         DebugLog.Add($"Free symbol: {name}");
-                        _tablaSimbolos.Remove(name);
                     }
                 }
-            }
-
-            if (_scopeStack.Count > 0)
-            {
-                _stackPointer = _scopeStack.Pop();
+                _stackPointer = ambito.StackPointerGuardado;
+                _ambitoActual = ambito.Padre;
                 DebugLog.Add($"Restore sp={_stackPointer}");
             }
+        }
+
+        private Simbolo? BuscarSimbolo(string nombre)
+        {
+            for (var ambito = _ambitoActual; ambito != null; ambito = ambito.Padre)
+            {
+                if (_tablaSimbolos.TryGetValue((ambito.Id, nombre), out var simbolo))
+                    return simbolo;
+            }
+
+            return null;
+        }
+
+        private sealed class Ambito
+        {
+            public int Id { get; init; }
+            public string NombreCompleto { get; init; } = "";
+            public Ambito? Padre { get; init; }
+            public int StackPointerGuardado { get; init; }
+            public List<string> Simbolos { get; } = new();
         }
 
         private bool TiposCompatibles(string tipo1, string tipo2)
@@ -1160,5 +1198,6 @@
         // Memory info
         public int Address { get; set; }
         public int Size { get; set; }
+        public string Ambito { get; set; } = "Global";
     }
 }

@@ -81,7 +81,7 @@
             dataGridViewTextBoxColumn7 = new DataGridViewTextBoxColumn();
             dataGridViewTextBoxColumn8 = new DataGridViewTextBoxColumn();
             dataGridViewTextBoxColumn9 = new DataGridViewTextBoxColumn();
-            dataGridViewTextBoxColumn9 = new DataGridViewTextBoxColumn();
+            dataGridViewTextBoxColumn10 = new DataGridViewTextBoxColumn();
             btnSemantica = new Button();
             richTextBox1 = new RichTextBox();
             label4 = new Label();
@@ -606,8 +606,14 @@
             // 
             dgvTablaSimbolos.AllowUserToAddRows = false;
             dgvTablaSimbolos.BorderStyle = BorderStyle.None;
-            dgvTablaSimbolos.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dgvTablaSimbolos.Columns.AddRange(new DataGridViewColumn[] { dataGridViewTextBoxColumn5, dataGridViewTextBoxColumn6, dataGridViewTextBoxColumn7, dataGridViewTextBoxColumn8 });
+            dgvTablaSimbolos.ColumnHeadersDefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvTablaSimbolos.ColumnHeadersDefaultCellStyle.BackColor = Color.White;
+            dgvTablaSimbolos.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 8F, FontStyle.Bold);
+            dgvTablaSimbolos.ColumnHeadersDefaultCellStyle.ForeColor = SystemColors.ControlText;
+            dgvTablaSimbolos.ColumnHeadersDefaultCellStyle.WrapMode = DataGridViewTriState.True;
+            dgvTablaSimbolos.ColumnHeadersHeight = 40;
+            dgvTablaSimbolos.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
+            dgvTablaSimbolos.Columns.AddRange(new DataGridViewColumn[] { dataGridViewTextBoxColumn5, dataGridViewTextBoxColumn6, dataGridViewTextBoxColumn7, dataGridViewTextBoxColumn8, dataGridViewTextBoxColumn9, dataGridViewTextBoxColumn10 });
             dataGridViewCellStyle6.Alignment = DataGridViewContentAlignment.MiddleLeft;
             dataGridViewCellStyle6.BackColor = SystemColors.Window;
             dataGridViewCellStyle6.Font = new Font("Segoe UI", 8F);
@@ -619,7 +625,8 @@
             dgvTablaSimbolos.Location = new Point(153, 555);
             dgvTablaSimbolos.Name = "dgvTablaSimbolos";
             dgvTablaSimbolos.ReadOnly = true;
-            dgvTablaSimbolos.RowHeadersWidth = 62;
+            dgvTablaSimbolos.RowHeadersWidth = 36;
+            dgvTablaSimbolos.RowTemplate.Height = 26;
             dgvTablaSimbolos.Size = new Size(721, 225);
             dgvTablaSimbolos.TabIndex = 22;
             // 
@@ -630,7 +637,7 @@
             dataGridViewTextBoxColumn5.MinimumWidth = 8;
             dataGridViewTextBoxColumn5.Name = "dataGridViewTextBoxColumn5";
             dataGridViewTextBoxColumn5.ReadOnly = true;
-            dataGridViewTextBoxColumn5.Width = 70;
+            dataGridViewTextBoxColumn5.Width = 45;
             // 
             // dataGridViewTextBoxColumn6
             // 
@@ -639,6 +646,7 @@
             dataGridViewTextBoxColumn6.MinimumWidth = 8;
             dataGridViewTextBoxColumn6.Name = "dataGridViewTextBoxColumn6";
             dataGridViewTextBoxColumn6.ReadOnly = true;
+            dataGridViewTextBoxColumn6.FillWeight = 110F;
             // 
             // dataGridViewTextBoxColumn7
             // 
@@ -647,6 +655,7 @@
             dataGridViewTextBoxColumn7.MinimumWidth = 8;
             dataGridViewTextBoxColumn7.Name = "dataGridViewTextBoxColumn7";
             dataGridViewTextBoxColumn7.ReadOnly = true;
+            dataGridViewTextBoxColumn7.FillWeight = 110F;
             // 
             // dataGridViewTextBoxColumn8
             // 
@@ -655,26 +664,25 @@
             dataGridViewTextBoxColumn8.MinimumWidth = 8;
             dataGridViewTextBoxColumn8.Name = "dataGridViewTextBoxColumn8";
             dataGridViewTextBoxColumn8.ReadOnly = true;
+            dataGridViewTextBoxColumn8.FillWeight = 75F;
             // 
             // dataGridViewTextBoxColumn9
             // 
             dataGridViewTextBoxColumn9.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            dataGridViewTextBoxColumn9.HeaderText = "Referencia (addr)";
+            dataGridViewTextBoxColumn9.HeaderText = "Ámbito";
             dataGridViewTextBoxColumn9.MinimumWidth = 8;
             dataGridViewTextBoxColumn9.Name = "dataGridViewTextBoxColumn9";
             dataGridViewTextBoxColumn9.ReadOnly = true;
+            dataGridViewTextBoxColumn9.FillWeight = 120F;
             // 
-            // dataGridViewTextBoxColumn9 (declared as field)
+            // dataGridViewTextBoxColumn10
             // 
-            // 
-            // dataGridViewTextBoxColumn9
-            // 
-            dataGridViewTextBoxColumn9 = new DataGridViewTextBoxColumn();
-            dataGridViewTextBoxColumn9.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
-            dataGridViewTextBoxColumn9.HeaderText = "Referencia (addr)";
-            dataGridViewTextBoxColumn9.MinimumWidth = 8;
-            dataGridViewTextBoxColumn9.Name = "dataGridViewTextBoxColumn9";
-            dataGridViewTextBoxColumn9.ReadOnly = true;
+            dataGridViewTextBoxColumn10.AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            dataGridViewTextBoxColumn10.HeaderText = "Dirección (addr)";
+            dataGridViewTextBoxColumn10.MinimumWidth = 8;
+            dataGridViewTextBoxColumn10.Name = "dataGridViewTextBoxColumn10";
+            dataGridViewTextBoxColumn10.ReadOnly = true;
+            dataGridViewTextBoxColumn10.FillWeight = 120F;
             // 
             // btnSemantica
             // 
@@ -863,5 +871,6 @@
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn7;
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn8;
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn9;
+        private DataGridViewTextBoxColumn dataGridViewTextBoxColumn10;
     }
 }

@@ -321,6 +321,7 @@ namespace AnalizadorLexico
                     simbolo.Nombre,
                     simbolo.Tipo,
                     simbolo.Valor,
+                    simbolo.Ambito,
                     simbolo.Address
                 );
             }
