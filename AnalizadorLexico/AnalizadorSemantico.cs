@@ -535,41 +535,69 @@
 
         private string ParseCondic()
         {
-            int posTemp = _pos;
-            AvanzarARG7Lookahead(ref posTemp);
-            string opSiguiente = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
-
-            if (EsOL(opSiguiente))
-                return ParseOPL();
-            else if (EsOR(opSiguiente))
-                return ParseOPR();
-            else
-            {
-                Error($"Se esperaba operador lógico o relacional en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                return "ERROR";
-            }
+            // Always try parsing a logical expression sequence.
+            // Each logical operator connects full comparisons/conditions.
+            return ParseOPL();
         }
 
         private string ParseOPL()
         {
-            string tipo1 = ParseARG7();
-            if (!EsOL(TokenActual.token))
+            // Parse first condition (which can be a relational expression or boolean atom)
+            string tipoIzquierdo = ParseCondicionBase();
+            bool tieneOperadorLogico = false;
+            bool hayError = tipoIzquierdo == "ERROR";
+
+            // Allow chained logical operators: cond (OL cond)*
+            while (EsOLBinario(TokenActual.token))
             {
-                Error($"Se esperaba operador lógico (Y/O/NO) en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                return "ERROR";
+                tieneOperadorLogico = true;
+                Consumir(TokenActual.token, "Se esperaba operador lógico");
+                string tipoDerecho = ParseCondicionBase();
+
+                if (tipoIzquierdo == "ERROR" || tipoDerecho == "ERROR")
+                {
+                    hayError = true;
+                    continue;
+                }
+
+                if (tipoIzquierdo != "BOOL" || tipoDerecho != "BOOL")
+                {
+                    Error($"Operación lógica requiere operandos booleanos en línea {TokenActual.linea}");
+                    hayError = true;
+                }
+
+                // result of logical operation is boolean
+                tipoIzquierdo = "BOOL";
             }
-            Consumir(TokenActual.token, "Se esperaba operador lógico");
-            string tipo2 = ParseARG7();
 
-            if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
+            if (hayError) return "ERROR";
+            return tieneOperadorLogico ? "BOOL" : tipoIzquierdo;
+        }
 
-            if (tipo1 != "BOOL" || tipo2 != "BOOL")
+        private string ParseCondicionBase()
+        {
+            if (TokenActual.token == "OL2")
             {
-                Error($"Operación lógica requiere operandos booleanos en línea {TokenActual.linea}");
-                return "ERROR";
+                Consumir("OL2", "Se esperaba operador NO");
+                string tipoNegado = ParseCondicionBase();
+
+                if (tipoNegado == "ERROR") return "ERROR";
+                if (tipoNegado != "BOOL")
+                {
+                    Error($"El operador 'NO' requiere una condición booleana en línea {TokenActual.linea}");
+                    return "ERROR";
+                }
+
+                return "BOOL";
             }
 
-            return "BOOL";
+            int posTemp = _pos;
+            AvanzarARG7Lookahead(ref posTemp);
+            string operador = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
+
+            // If a relational operator follows the first operand, parse a relational operation;
+            // otherwise parse a single ARG7 (which may be a parenthesized subcondition).
+            return EsOR(operador) ? ParseOPR() : ParseARG7();
         }
 
         private string ParseOPR()
@@ -599,19 +627,9 @@
             if (TokenActual.token == "CD3")
             {
                 Consumir("CD3", "Se esperaba '('");
-
-                int posLookahead = _pos;
-                AvanzarARG7Lookahead(ref posLookahead);
-                string opDentro = posLookahead < _tokens.Count ? _tokens[posLookahead].token : "EOF";
-
-                string tipoResultado;
-                if (EsOL(opDentro))
-                    tipoResultado = ParseOPL();
-                else if (EsOR(opDentro))
-                    tipoResultado = ParseOPR();
-                else
-                    tipoResultado = ParseOPA();
-
+                // When a parenthesized group is found, parse the whole internal condition
+                // (which may be logical, relational or arithmetic depending on content).
+                string tipoResultado = ParseCondic();
                 Consumir("CD4", "Se esperaba ')' para cerrar ARG7");
                 return tipoResultado;
             }
@@ -1033,6 +1051,7 @@
         private bool EsID(string token) => token != null && token.StartsWith("IDV");
         private bool EsCN(string token) => token == "CNU" || token == "CNR";
         private bool EsOL(string token) => token == "OL1" || token == "OL2" || token == "OL3";
+        private bool EsOLBinario(string token) => token == "OL1" || token == "OL3";
         private bool EsOR(string token)
         {
             if (string.IsNullOrEmpty(token)) return false;

@@ -383,36 +383,42 @@
         private void ParseCondic()
         {
             Pasos.Add($"[CONDIC] token: {TokenActual.token} '{TokenActual.valor}'");
-
-            int posTemp = _pos;
-            AvanzarARG7Lookahead(ref posTemp);
-            string opSiguiente = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
-
-            if (EsOL(opSiguiente))
-                ParseOPL();
-            else if (EsOR(opSiguiente))
-                ParseOPR();
-            else
-            {
-                // No operator: allow a single ARG7 (e.g., 'si (x)') syntactically.
-                // Semantic analyzer will validate that the result is boolean.
-                ParseARG7();
-            }
+            ParseOPL();
         }
 
         private void ParseOPL()
         {
             Pasos.Add("[OPL] Operación lógica...");
-            ParseARG7();
-            if (EsOL(TokenActual.token))
+            // Parse left side of logical operation
+            ParseCondicionBase();
+            // zero or more (logical-operator condition) sequences
+            while (EsOLBinario(TokenActual.token))
             {
                 Pasos.Add($"[OL] '{TokenActual.valor}' ({TokenActual.token})");
                 Avanzar();
+                // after consuming the operator, parse the right-side condition
+                ParseCondicionBase();
             }
-            else
-                Error($"Se esperaba operador lógico (Y/O/NO) en línea {_ultimaLineaConsumida}, se encontró '{TokenActual.valor}'");
-            ParseARG7();
             Pasos.Add("[OPL] Operación lógica reconocida ✔");
+        }
+
+        private void ParseCondicionBase()
+        {
+            if (TokenActual.token == "OL2")
+            {
+                Avanzar();
+                ParseCondicionBase();
+                return;
+            }
+
+            int posTemp = _pos;
+            AvanzarARG7Lookahead(ref posTemp);
+            string operador = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
+
+            if (EsOR(operador))
+                ParseOPR();
+            else
+                ParseARG7();
         }
 
         private void ParseOPR()
@@ -436,14 +442,8 @@
 
             if (TokenActual.token == "CD3")
             {
-                int posTemp = _pos + 1;
-                AvanzarARG7Lookahead(ref posTemp);
-                string opDentro = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
-
                 Consumir("CD3", "Se esperaba '('");
-                if (EsOL(opDentro)) ParseOPL();
-                else if (EsOR(opDentro)) ParseOPR();
-                else ParseOPA();
+                ParseCondic();
                 Consumir("CD4", "Se esperaba ')' para cerrar ARG7");
             }
             else if (EsID(TokenActual.token) || EsCN(TokenActual.token))
@@ -727,6 +727,7 @@
         private bool EsID(string token) => token != null && token.StartsWith("IDV");
         private bool EsCN(string token) => token == "CNU" || token == "CNR";
         private bool EsOL(string token) => token == "OL1" || token == "OL2" || token == "OL3";
+        private bool EsOLBinario(string token) => token == "OL1" || token == "OL3";
         private bool EsOR(string token) => token == "OR1" || token == "OR2" || token == "OR3"
                                                   || token == "OR4" || token == "OR5" || token == "OR6";
         private bool EsOA(string token) => token == "OA1" || token == "OA2" || token == "OA3"
