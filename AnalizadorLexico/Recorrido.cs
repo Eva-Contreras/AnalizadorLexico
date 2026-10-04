@@ -180,32 +180,23 @@ namespace AnalizadorLexico
                 return (true, tokenReservado, recorrido);
             }
 
+            // If the token is a numeric literal (integer or real) we return it directly
+            // so the DFA / DB does not misclassify float values.
             if (!string.IsNullOrEmpty(cadena))
             {
+                // Accept formats like: 123, -123, 3.14, -2.5, 1E3, 2e-1
                 var styles = System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowLeadingSign;
                 if (double.TryParse(cadena, styles, System.Globalization.CultureInfo.InvariantCulture, out _))
                 {
+                    // classify as CNR if it contains a decimal point, exponent or scientific notation
                     if (cadena.Contains('.') || cadena.IndexOf('e', System.StringComparison.OrdinalIgnoreCase) >= 0)
                         return (true, "CNR", $"(0) {cadena} -> CNR");
                     return (true, "CNU", $"(0) {cadena} -> CNU");
                 }
+                // handle custom exponent notation using '**' produced by tokenizer
                 if (cadena.Contains("**"))
                 {
                     return (true, "CNR", $"(0) {cadena} -> CNR");
-                }
-            }
-
-            if (!string.IsNullOrEmpty(cadena) && cadena.All(char.IsLetter))
-            {
-                var clavesReservadas = new HashSet<string>(palabrasReservadas.Keys, StringComparer.OrdinalIgnoreCase);
-                foreach (var reserved in clavesReservadas)
-                {
-                    if (cadena.Length > reserved.Length &&
-                        cadena.StartsWith(reserved, StringComparison.OrdinalIgnoreCase))
-                    {
-                        string mensaje = $"Error: posible palabra reservada mal escrita cerca de '{reserved}'";
-                        return (false, mensaje, $"(0) {cadena} -> (ERROR)");
-                    }
                 }
             }
 
@@ -465,6 +456,31 @@ namespace AnalizadorLexico
                     tokens.Add(palabra);
                     continue;
                 }
+
+                /*if (char.IsLetter(c))
+                {
+                    string palabra = "";
+                    while (i < linea.Length)
+                    {
+                        char actual = linea[i];
+                        if (char.IsLetterOrDigit(actual))
+                        {
+                            palabra += actual;
+                            i++;
+                        }
+                        else if (EsCaracterEspecial(actual) && !char.IsWhiteSpace(actual))
+                        {
+                            palabra += actual;
+                            i++;
+                        }
+                        else
+                        {
+                            break;
+                        }
+                    }
+                    tokens.Add(palabra);
+                    continue;
+                }*/
 
                 if ((c == '+' || c == '-') && i + 1 < linea.Length && char.IsDigit(linea[i + 1]))
                 {
