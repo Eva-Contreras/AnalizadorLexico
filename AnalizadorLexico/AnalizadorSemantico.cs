@@ -106,7 +106,7 @@
 
             if (tipoInit != "ENT")
             {
-                Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {TokenActual.linea}");
+                Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {lineaDeclaracion}");
                 return;
             }
 
@@ -145,7 +145,7 @@
 
             if (!EsNumerico(tipoInit))
             {
-                Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {TokenActual.linea}");
+                Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {lineaDeclaracion}");
                 return;
             }
 
@@ -184,7 +184,7 @@
 
             if (tipoInit != "CAD")
             {
-                Error($"Tipo incompatible en inicialización de CAD: {tipoInit} en línea {TokenActual.linea}");
+                Error($"Tipo incompatible en inicialización de CAD: {tipoInit} en línea {lineaDeclaracion}");
                 return;
             }
 
@@ -207,6 +207,7 @@
         {
             DebugLog.Add($"ParseAsignacion at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             string id = TokenActual.valor;
+            int lineaAsignacion = TokenActual.linea;
             if (!EsID(TokenActual.token))
             {
                 Error($"Se esperaba identificador en asignación en línea {TokenActual.linea}");
@@ -226,13 +227,13 @@
             var simbolo = BuscarSimbolo(id);
             if (simbolo == null)
             {
-                Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
+                Error($"Variable '{id}' no declarada en línea {lineaAsignacion}");
                 return;
             }
 
             if (!TiposCompatibles(simbolo.Tipo, tipoRHS))
             {
-                Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {TokenActual.linea}");
+                Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {lineaAsignacion}");
                 return;
             }
 
@@ -307,6 +308,7 @@
             Consumir("PR4", "Se esperaba 'si'");
             Consumir("CD3", "Se esperaba '(' después de 'si'");
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
 
             Consumir("CD4", "Se esperaba ')' después de la condición");
@@ -314,7 +316,7 @@
 
             if (tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en línea {lineaCondicion}");
             }
 
             ParseBloque();
@@ -375,6 +377,7 @@
             Consumir("PR9", "Se esperaba 'mientras'");
             Consumir("CD3", "Se esperaba '(' después de 'mientras'");
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
 
             Consumir("CD4", "Se esperaba ')' después de la condición en 'mientras'");
@@ -382,7 +385,7 @@
 
             if (tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en 'mientras' en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en 'mientras' en línea {lineaCondicion}");
             }
 
             ParseBloque();
@@ -399,6 +402,7 @@
             Consumir("PR9", "Se esperaba 'mientras' después del bloque 'hacer'");
             Consumir("CD3", "Se esperaba '(' después de 'mientras' en 'hacer'");
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
 
             Consumir("CD4", "Se esperaba ')' después de la condición en 'hacer'");
@@ -406,7 +410,7 @@
 
             if (tipoCond != "ERROR" && tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en 'hacer' en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en 'hacer' en línea {lineaCondicion}");
             }
         }
 
@@ -443,6 +447,7 @@
             if (BuscarSimbolo(id) == null)
                 RegistrarSimbolo(id, "ENT", initValor, lineaDeclaracion);
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
             Consumir("CD5", "Se esperaba ';' después de condición en 'para'");
 
@@ -475,7 +480,7 @@
 
             if (tipoCond != "ERROR" && tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en 'para' en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en 'para' en línea {lineaCondicion}");
             }
 
             Consumir("CD1", "Se esperaba '{' para abrir bloque 'para'");
