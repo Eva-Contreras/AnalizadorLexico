@@ -5,7 +5,8 @@ namespace AnalizadorLexico
     public class Recorrido
     {
         // Cadena de conexión
-        protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        //protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -179,6 +180,26 @@ namespace AnalizadorLexico
                 return (true, tokenReservado, recorrido);
             }
 
+            // If the token is a numeric literal (integer or real) we return it directly
+            // so the DFA / DB does not misclassify float values.
+            if (!string.IsNullOrEmpty(cadena))
+            {
+                // Accept formats like: 123, -123, 3.14, -2.5, 1E3, 2e-1
+                var styles = System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowLeadingSign;
+                if (double.TryParse(cadena, styles, System.Globalization.CultureInfo.InvariantCulture, out _))
+                {
+                    // classify as CNR if it contains a decimal point, exponent or scientific notation
+                    if (cadena.Contains('.') || cadena.IndexOf('e', System.StringComparison.OrdinalIgnoreCase) >= 0)
+                        return (true, "CNR", $"(0) {cadena} -> CNR");
+                    return (true, "CNU", $"(0) {cadena} -> CNU");
+                }
+                // handle custom exponent notation using '**' produced by tokenizer
+                if (cadena.Contains("**"))
+                {
+                    return (true, "CNR", $"(0) {cadena} -> CNR");
+                }
+            }
+
             CargarTabla();
             int estadoNormal = 0;
             string recorridoNormal = $"({estadoNormal})";
@@ -269,8 +290,8 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                 // return "_" + c.ToString();
-                return c.ToString(); 
+                  return "_" + c.ToString();
+               // return c.ToString(); 
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
