@@ -10,7 +10,7 @@ namespace AnalizadorLexico
     public class DeclarationNode : AstNode
     {
         public string Tipo { get; set; } = ""; // ENT, DEC, CAD
-        public string Identificador { get; set; } = "";
+        public string Identificador { get; set; } = ""; 
         public AstNode? Valor { get; set; }
         // Memory information (assigned by semantic analyzer)
         public int? MemoryAddress { get; set; }

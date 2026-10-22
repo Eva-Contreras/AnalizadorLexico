@@ -280,6 +280,10 @@ namespace AnalizadorLexico
             // Obtener tokens del análisis léxico
             var (tokens, _, _) = r.AnalizarPrograma(texto);
 
+            // Generar el AST con los mismos tokens y compartirlo con el análisis semántico
+            _sintactico.Analizar(tokens);
+            _semantico.AstRoot = _sintactico.AstRoot;
+
             // Ejecutar análisis semántico
             bool valido = _semantico.Analizar(tokens);
 
@@ -321,6 +325,7 @@ namespace AnalizadorLexico
                     simbolo.Nombre,
                     simbolo.Tipo,
                     simbolo.Valor,
+                    simbolo.Ambito,
                     simbolo.Address
                 );
             }

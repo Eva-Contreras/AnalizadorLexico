@@ -290,8 +290,8 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                  return "_" + c.ToString();
-               // return c.ToString(); 
+                  return "_" + c.ToString(); 
+                //return c.ToString();
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;

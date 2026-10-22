@@ -5,15 +5,15 @@
         private List<(int linea, string valor, string token)> _tokens = new();
         private int _pos;
         private int _ultimaLineaConsumida = 0;
-        private Dictionary<string, Simbolo> _tablaSimbolos = new();
-        // Simple stack-based memory model
-        private int _stackPointer = 0; // next free address (bytes)
-        private Stack<int> _scopeStack = new(); // saved stack pointers per scope
-        private Stack<List<string>> _symbolsPerScope = new(); // symbols allocated per scope
+        private Dictionary<(int ambitoId, string nombre), Simbolo> _tablaSimbolos = new();
+        private int _stackPointer = 0; 
+        private Stack<Ambito> _ambitos = new();
+        private Ambito? _ambitoActual;
+        private int _siguienteIdAmbito;
+        private int _siguienteIdSimbolo;
         public List<string> Errores { get; private set; } = new();
         public List<string> DebugLog { get; private set; } = new();
         public List<Simbolo> TablaSimbolosFinal { get; private set; } = new();
-        // Optional AST produced by the parser; analyzer can use it in future extensions
         public ProgramNode? AstRoot { get; set; }
 
         private (int linea, string valor, string token) TokenActual => _pos < _tokens.Count ? _tokens[_pos] : (-1, "EOF", "EOF");
@@ -28,16 +28,18 @@
             DebugLog.Add("Analizar: inicio");
             _tablaSimbolos.Clear();
             TablaSimbolosFinal.Clear();
+            _ambitos.Clear();
+            _ambitoActual = null;
+            _siguienteIdAmbito = 0;
+            _siguienteIdSimbolo = 0;
+            _stackPointer = 0;
 
-            // start global scope
             EnterScope();
 
             try
             {
                 while (TokenActual.token != "EOF")
                     ParseS();
-
-                TablaSimbolosFinal = _tablaSimbolos.Values.ToList();
 
                 return Errores.Count == 0;
             }
@@ -93,43 +95,28 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // aceptar inicializador: constante entera o identificador de tipo ENT
-            if (TokenActual.token == "CNU")
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
+            string tipoInit = ParseARG2();
+
+            Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
+
+            if (tipoInit == "ERROR") return;
+
+            if (tipoInit != "ENT")
             {
-                string valor = TokenActual.valor;
-                Consumir("CNU", "Se esperaba constante entera");
-                Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
-                RegistrarSimbolo(id, "ENT", valor, lineaDeclaracion);
+                Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {lineaDeclaracion}");
                 return;
             }
-            else if (EsID(TokenActual.token))
-            {
-                string idInit = TokenActual.valor;
-                Consumir(TokenActual.token, "Se esperaba identificador como inicializador");
-                if (!_tablaSimbolos.ContainsKey(idInit))
-                {
-                    Error($"Variable '{idInit}' no declarada en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                // inicializador debe ser ENT (no permitir DEC -> ENT implicitamente)
-                string tipoInit = _tablaSimbolos[idInit].Tipo;
-                if (tipoInit != "ENT")
-                {
-                    Error($"Tipo incompatible en inicialización de ENT: {tipoInit} en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
-                RegistrarSimbolo(id, "ENT", idInit, lineaDeclaracion);
-                return;
-            }
-            else
-            {
-                Error($"Se esperaba constante entera o identificador en declaración ENT en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                SkipToEndOfStatement();
-                return;
-            }
+
+            string valorRegistrar = "";
+            if (tokenInicio == "CNU") 
+                valorRegistrar = valorInicio;
+            else if (EsID(tokenInicio)) 
+                valorRegistrar = valorInicio;
+
+            RegistrarSimbolo(id, "ENT", valorRegistrar, lineaDeclaracion);
         }
 
         private void ParseDeclaracionDEC()
@@ -147,42 +134,28 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            // aceptar inicializador: constante numérica (CNR/CNU) o identificador numérico
-            if (TokenActual.token == "CNR" || TokenActual.token == "CNU")
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
+            string tipoInit = ParseARG2();
+
+            Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
+
+            if (tipoInit == "ERROR") return;
+
+            if (!EsNumerico(tipoInit))
             {
-                string valor = TokenActual.valor;
-                Consumir(TokenActual.token, "Se esperaba constante numérica");
-                Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
-                RegistrarSimbolo(id, "DEC", valor, lineaDeclaracion);
+                Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {lineaDeclaracion}");
                 return;
             }
-            else if (EsID(TokenActual.token))
-            {
-                string idInit = TokenActual.valor;
-                Consumir(TokenActual.token, "Se esperaba identificador como inicializador");
-                if (!_tablaSimbolos.ContainsKey(idInit))
-                {
-                    Error($"Variable '{idInit}' no declarada en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                string tipoInit = _tablaSimbolos[idInit].Tipo;
-                if (!EsNumerico(tipoInit))
-                {
-                    Error($"Tipo incompatible en inicialización de DEC: {tipoInit} en línea {TokenActual.linea}");
-                    SkipToEndOfStatement();
-                    return;
-                }
-                Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
-                RegistrarSimbolo(id, "DEC", idInit, lineaDeclaracion);
-                return;
-            }
-            else
-            {
-                Error($"Se esperaba constante numérica o identificador en declaración DEC en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                SkipToEndOfStatement();
-                return;
-            }
+
+            string valorRegistrar = "";
+            if (tokenInicio == "CNU" || tokenInicio == "CNR")
+                valorRegistrar = valorInicio;
+            else if (EsID(tokenInicio))
+                valorRegistrar = valorInicio;
+
+            RegistrarSimbolo(id, "DEC", valorRegistrar, lineaDeclaracion);
         }
 
         private void ParseDeclaracionCAD()
@@ -200,24 +173,41 @@
 
             Consumir("OPA", "Se esperaba '=' después del identificador");
 
-            string valor = TokenActual.valor;
-            if (TokenActual.token != "CAD")
-            {
-                Error($"Se esperaba literal de cadena en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                SkipToEndOfStatement();
-                return;
-            }
-            Consumir("CAD", "Se esperaba literal de cadena");
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
+            string tipoInit = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
 
-            RegistrarSimbolo(id, "CAD", valor, lineaDeclaracion);
+            if (tipoInit == "ERROR") return;
+
+            if (tipoInit != "CAD")
+            {
+                Error($"Tipo incompatible en inicialización de CAD: {tipoInit} en línea {lineaDeclaracion}");
+                return;
+            }
+
+            string valorRegistrar = "";
+            if (tokenInicio == "CAD")
+            {
+                valorRegistrar = valorInicio;
+            }
+            else if (EsID(tokenInicio))
+            {
+                var simboloInicial = BuscarSimbolo(valorInicio);
+                if (simboloInicial != null)
+                    valorRegistrar = simboloInicial.Valor ?? "";
+            }
+
+            RegistrarSimbolo(id, "CAD", valorRegistrar, lineaDeclaracion);
         }
 
         private void ParseAsignacion()
         {
             DebugLog.Add($"ParseAsignacion at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             string id = TokenActual.valor;
+            int lineaAsignacion = TokenActual.linea;
             if (!EsID(TokenActual.token))
             {
                 Error($"Se esperaba identificador en asignación en línea {TokenActual.linea}");
@@ -227,20 +217,45 @@
 
             Consumir("OPA", "Se esperaba '=' en asignación");
 
+            string tokenInicio = TokenActual.token;
+            string valorInicio = TokenActual.valor;
+
             string tipoRHS = ParseARG2();
 
             Consumir("CD5", "Se esperaba ';' al final de asignación");
 
-            if (!_tablaSimbolos.ContainsKey(id))
+            var simbolo = BuscarSimbolo(id);
+            if (simbolo == null)
             {
-                Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
+                Error($"Variable '{id}' no declarada en línea {lineaAsignacion}");
                 return;
             }
 
-            var simbolo = _tablaSimbolos[id];
             if (!TiposCompatibles(simbolo.Tipo, tipoRHS))
             {
-                Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {TokenActual.linea}");
+                Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {lineaAsignacion}");
+                return;
+            }
+
+            if (tipoRHS != "ERROR")
+            {
+                string valorRegistrar = "";
+                if (tokenInicio == "CNU" || tokenInicio == "CNR")
+                {
+                    valorRegistrar = valorInicio;
+                }
+                else if (EsID(tokenInicio))
+                {
+                    string idInit = valorInicio;
+                    var simInit = BuscarSimbolo(idInit);
+                    if (simInit != null)
+                    {
+                        valorRegistrar = simInit.Valor ?? "";
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(valorRegistrar))
+                    simbolo.Valor = valorRegistrar;
             }
         }
 
@@ -261,7 +276,7 @@
             Consumir("CD4", "Se esperaba ')' en 'leer'");
             Consumir("CD5", "Se esperaba ';' al final de 'leer'");
 
-            if (!_tablaSimbolos.ContainsKey(id))
+            if (BuscarSimbolo(id) == null)
             {
                 Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
             }
@@ -293,6 +308,7 @@
             Consumir("PR4", "Se esperaba 'si'");
             Consumir("CD3", "Se esperaba '(' después de 'si'");
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
 
             Consumir("CD4", "Se esperaba ')' después de la condición");
@@ -300,7 +316,7 @@
 
             if (tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en línea {lineaCondicion}");
             }
 
             ParseBloque();
@@ -361,6 +377,7 @@
             Consumir("PR9", "Se esperaba 'mientras'");
             Consumir("CD3", "Se esperaba '(' después de 'mientras'");
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
 
             Consumir("CD4", "Se esperaba ')' después de la condición en 'mientras'");
@@ -368,12 +385,11 @@
 
             if (tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en 'mientras' en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en 'mientras' en línea {lineaCondicion}");
             }
 
             ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque 'mientras'");
-            Consumir("CD5", "Se esperaba ';' al final de 'mientras'");
         }
 
         private void ParseHacer()
@@ -386,6 +402,7 @@
             Consumir("PR9", "Se esperaba 'mientras' después del bloque 'hacer'");
             Consumir("CD3", "Se esperaba '(' después de 'mientras' en 'hacer'");
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
 
             Consumir("CD4", "Se esperaba ')' después de la condición en 'hacer'");
@@ -393,7 +410,7 @@
 
             if (tipoCond != "ERROR" && tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en 'hacer' en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en 'hacer' en línea {lineaCondicion}");
             }
         }
 
@@ -427,9 +444,10 @@
 
             Consumir("CD5", "Se esperaba ';' después de inicialización en 'para'");
 
-            if (!_tablaSimbolos.ContainsKey(id))
+            if (BuscarSimbolo(id) == null)
                 RegistrarSimbolo(id, "ENT", initValor, lineaDeclaracion);
 
+            int lineaCondicion = TokenActual.linea;
             string tipoCond = ParseCondic();
             Consumir("CD5", "Se esperaba ';' después de condición en 'para'");
 
@@ -449,11 +467,12 @@
 
             if (tipoIncremento != "ERROR")
             {
-                if (!_tablaSimbolos.ContainsKey(idIncremento))
+                var simboloIncremento = BuscarSimbolo(idIncremento);
+                if (simboloIncremento == null)
                 {
                     Error($"Variable '{idIncremento}' no declarada en 'para' en línea {TokenActual.linea}");
                 }
-                else if (!TiposCompatibles(_tablaSimbolos[idIncremento].Tipo, tipoIncremento))
+                else if (!TiposCompatibles(simboloIncremento.Tipo, tipoIncremento))
                 {
                     Error($"Tipo incompatible en incremento de 'para' en línea {TokenActual.linea}");
                 }
@@ -461,7 +480,7 @@
 
             if (tipoCond != "ERROR" && tipoCond != "BOOL")
             {
-                Error($"Se esperaba condición booleana en 'para' en línea {TokenActual.linea}");
+                Error($"Se esperaba condición booleana en 'para' en línea {lineaCondicion}");
             }
 
             Consumir("CD1", "Se esperaba '{' para abrir bloque 'para'");
@@ -504,51 +523,69 @@
         private void ParseBloque()
         {
             DebugLog.Add($"ParseBloque at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
-            // enter a new scope for this block
             EnterScope();
             while (TokenActual.token != "CD2" && TokenActual.token != "EOF")
                 ParseS();
-            // exit block scope and free its symbols
             ExitScope();
         }
 
         private string ParseCondic()
         {
-            int posTemp = _pos;
-            AvanzarARG7Lookahead(ref posTemp);
-            string opSiguiente = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
-
-            if (EsOL(opSiguiente))
-                return ParseOPL();
-            else if (EsOR(opSiguiente))
-                return ParseOPR();
-            else
-            {
-                Error($"Se esperaba operador lógico o relacional en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                return "ERROR";
-            }
+            return ParseOPL();
         }
 
         private string ParseOPL()
         {
-            string tipo1 = ParseARG7();
-            if (!EsOL(TokenActual.token))
+            string tipoIzquierdo = ParseCondicionBase();
+            bool tieneOperadorLogico = false;
+            bool hayError = tipoIzquierdo == "ERROR";
+
+            while (EsOLBinario(TokenActual.token))
             {
-                Error($"Se esperaba operador lógico (Y/O/NO) en línea {TokenActual.linea}, se encontró '{TokenActual.valor}'");
-                return "ERROR";
+                tieneOperadorLogico = true;
+                Consumir(TokenActual.token, "Se esperaba operador lógico");
+                string tipoDerecho = ParseCondicionBase();
+
+                if (tipoIzquierdo == "ERROR" || tipoDerecho == "ERROR")
+                {
+                    hayError = true;
+                    continue;
+                }
+
+                if (tipoIzquierdo != "BOOL" || tipoDerecho != "BOOL")
+                {
+                    Error($"Operación lógica requiere operandos booleanos en línea {TokenActual.linea}");
+                    hayError = true;
+                }
+
+                tipoIzquierdo = "BOOL";
             }
-            Consumir(TokenActual.token, "Se esperaba operador lógico");
-            string tipo2 = ParseARG7();
 
-            if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
+            if (hayError) return "ERROR";
+            return tieneOperadorLogico ? "BOOL" : tipoIzquierdo;
+        }
 
-            if (tipo1 != "BOOL" || tipo2 != "BOOL")
+        private string ParseCondicionBase()
+        {
+            if (TokenActual.token == "OL2")
             {
-                Error($"Operación lógica requiere operandos booleanos en línea {TokenActual.linea}");
-                return "ERROR";
+                Consumir("OL2", "Se esperaba operador NO");
+                string tipoNegado = ParseCondicionBase();
+
+                if (tipoNegado == "ERROR") return "ERROR";
+                if (tipoNegado != "BOOL")
+                {
+                    Error($"El operador 'NO' requiere una condición booleana en línea {TokenActual.linea}");
+                    return "ERROR";
+                }
+
+                return "BOOL";
             }
 
-            return "BOOL";
+            int posTemp = _pos;
+            AvanzarARG7Lookahead(ref posTemp);
+            string operador = posTemp < _tokens.Count ? _tokens[posTemp].token : "EOF";
+            return EsOR(operador) ? ParseOPR() : ParseARG7();
         }
 
         private string ParseOPR()
@@ -578,19 +615,7 @@
             if (TokenActual.token == "CD3")
             {
                 Consumir("CD3", "Se esperaba '('");
-
-                int posLookahead = _pos;
-                AvanzarARG7Lookahead(ref posLookahead);
-                string opDentro = posLookahead < _tokens.Count ? _tokens[posLookahead].token : "EOF";
-
-                string tipoResultado;
-                if (EsOL(opDentro))
-                    tipoResultado = ParseOPL();
-                else if (EsOR(opDentro))
-                    tipoResultado = ParseOPR();
-                else
-                    tipoResultado = ParseOPA();
-
+                string tipoResultado = ParseCondic();
                 Consumir("CD4", "Se esperaba ')' para cerrar ARG7");
                 return tipoResultado;
             }
@@ -599,7 +624,8 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                var simbolo = BuscarSimbolo(id);
+                if (simbolo == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
@@ -610,17 +636,38 @@
                     return "ERROR";
                 }
 
-                string tipoLeft = _tablaSimbolos[id].Tipo;
+                string tipoLeft = simbolo.Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    Avanzar();
+                    string opToken = TokenActual.token;
+                    string opLexema = TokenActual.valor;
+                    Avanzar(); 
                     string tipoRight = ParseARG4();
                     if (tipoLeft == "ERROR" || tipoRight == "ERROR") return "ERROR";
+
+                    bool esMas = opToken == "MAS" || opLexema == "+" || opToken == "OA1";
+                    if (esMas)
+                    {
+                        if (tipoLeft == "CAD" && tipoRight == "CAD")
+                        {
+                            tipoLeft = "CAD";
+                            continue;
+                        }
+                        if (EsNumerico(tipoLeft) && EsNumerico(tipoRight))
+                        {
+                            tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
+                            continue;
+                        }
+                        Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
+                        return "ERROR";
+                    }
+
                     if (!EsNumerico(tipoLeft) || !EsNumerico(tipoRight))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
                         return "ERROR";
                     }
+
                     tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                 }
 
@@ -677,7 +724,8 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                var simbolo = BuscarSimbolo(id);
+                if (simbolo == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     if (_pos < _tokens.Count && EsOA(TokenActual.token))
@@ -688,17 +736,40 @@
                     return "ERROR";
                 }
 
-                string tipoLeft = _tablaSimbolos[id].Tipo;
+                string tipoLeft = simbolo.Tipo;
                 while (_pos < _tokens.Count && EsOA(TokenActual.token))
                 {
-                    Avanzar();
+                    string opToken = TokenActual.token;
+                    string opLexema = TokenActual.valor;
+                    Consumir(TokenActual.token, "Se esperaba operador aritmético");
+
                     string tipoRight = ParseARG4();
                     if (tipoLeft == "ERROR" || tipoRight == "ERROR") return "ERROR";
+
+                    bool esMas = opToken == "MAS" || opLexema == "+" || opToken == "OA1";
+                    if (esMas)
+                    {
+                        if (tipoLeft == "CAD" && (tipoRight == "CAD" || EsNumerico(tipoRight)))
+                        {
+                            tipoLeft = "CAD";
+                            continue;
+                        }
+                        if (EsNumerico(tipoLeft) && EsNumerico(tipoRight))
+                        {
+                            tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
+                            continue;
+                        }
+
+                        Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
+                        return "ERROR";
+                    }
+
                     if (!EsNumerico(tipoLeft) || !EsNumerico(tipoRight))
                     {
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
                         return "ERROR";
                     }
+
                     tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                 }
 
@@ -756,7 +827,7 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                if (BuscarSimbolo(id) == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                 }
@@ -822,7 +893,8 @@
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
-                if (!_tablaSimbolos.ContainsKey(id))
+                var simbolo = BuscarSimbolo(id);
+                if (simbolo == null)
                 {
                     Error($"Variable '{id}' no declarada en línea {TokenActual.linea}");
                     int posTemp = _pos;
@@ -830,7 +902,7 @@
                         ParseOPA();
                     return "ERROR";
                 }
-                return _tablaSimbolos[id].Tipo;
+                return simbolo.Tipo;
             }
             else if (EsCN(TokenActual.token))
             {
@@ -853,7 +925,7 @@
 
         private void RegistrarSimbolo(string id, string tipo, string valor, int linea)
         {
-            if (_tablaSimbolos.ContainsKey(id))
+            if (_ambitoActual != null && _tablaSimbolos.ContainsKey((_ambitoActual.Id, id)))
             {
                 Error($"Variable '{id}' ya declarada en línea {linea}");
                 return;
@@ -865,24 +937,23 @@
 
             var simbolo = new Simbolo
             {
-                Id = _tablaSimbolos.Count + 1,
+                Id = ++_siguienteIdSimbolo,
                 Nombre = id,
                 Tipo = tipo,
                 Valor = valor,
                 Linea = linea,
                 Address = address,
-                Size = size
+                Size = size,
+                Ambito = _ambitoActual?.Padre is null ? "Global" : "Local"
             };
 
-            _tablaSimbolos[id] = simbolo;
+            _tablaSimbolos[(_ambitoActual?.Id ?? 0, id)] = simbolo;
+            TablaSimbolosFinal.Add(simbolo);
 
-            // record allocation in current scope so it can be freed on ExitScope
-            if (_symbolsPerScope.Count > 0)
-                _symbolsPerScope.Peek().Add(id);
+            _ambitoActual?.Simbolos.Add(id);
 
             DebugLog.Add($"RegistrarSimbolo: '{id}' tipo={tipo} addr={address} size={size} line={linea}");
 
-            // annotate AST declaration node if available
             AnnotateDeclarationInAst(id, address, size);
         }
 
@@ -892,7 +963,7 @@
             {
                 "ENT" => 4,
                 "DEC" => 8,
-                "CAD" => 8, // store pointer/handle for string
+                "CAD" => 8, 
                 _ => 4
             };
         }
@@ -915,32 +986,58 @@
 
         private void EnterScope()
         {
-            DebugLog.Add($"EnterScope: sp={_stackPointer}");
-            _scopeStack.Push(_stackPointer);
-            _symbolsPerScope.Push(new List<string>());
+            int id = ++_siguienteIdAmbito;
+            var ambito = new Ambito
+            {
+                Id = id,
+                NombreCompleto = _ambitoActual == null
+                    ? "Global"
+                    : $"{_ambitoActual.NombreCompleto}/Bloque{id}",
+                Padre = _ambitoActual,
+                StackPointerGuardado = _stackPointer
+            };
+            _ambitos.Push(ambito);
+            _ambitoActual = ambito;
+            DebugLog.Add($"EnterScope: {_ambitoActual.NombreCompleto}, sp={_stackPointer}");
         }
 
         private void ExitScope()
         {
-            DebugLog.Add($"ExitScope: sp={_stackPointer}");
-            if (_symbolsPerScope.Count > 0)
+            if (_ambitos.Count > 0)
             {
-                var symbols = _symbolsPerScope.Pop();
-                foreach (var name in symbols)
+                var ambito = _ambitos.Pop();
+                DebugLog.Add($"ExitScope: {ambito.NombreCompleto}, sp={_stackPointer}");
+                foreach (var name in ambito.Simbolos)
                 {
-                    if (_tablaSimbolos.ContainsKey(name))
+                    if (_tablaSimbolos.Remove((ambito.Id, name)))
                     {
                         DebugLog.Add($"Free symbol: {name}");
-                        _tablaSimbolos.Remove(name);
                     }
                 }
-            }
-
-            if (_scopeStack.Count > 0)
-            {
-                _stackPointer = _scopeStack.Pop();
+                _stackPointer = ambito.StackPointerGuardado;
+                _ambitoActual = ambito.Padre;
                 DebugLog.Add($"Restore sp={_stackPointer}");
             }
+        }
+
+        private Simbolo? BuscarSimbolo(string nombre)
+        {
+            for (var ambito = _ambitoActual; ambito != null; ambito = ambito.Padre)
+            {
+                if (_tablaSimbolos.TryGetValue((ambito.Id, nombre), out var simbolo))
+                    return simbolo;
+            }
+
+            return null;
+        }
+
+        private sealed class Ambito
+        {
+            public int Id { get; init; }
+            public string NombreCompleto { get; init; } = "";
+            public Ambito? Padre { get; init; }
+            public int StackPointerGuardado { get; init; }
+            public List<string> Simbolos { get; } = new();
         }
 
         private bool TiposCompatibles(string tipo1, string tipo2)
@@ -959,7 +1056,30 @@
         private bool EsID(string token) => token != null && token.StartsWith("IDV");
         private bool EsCN(string token) => token == "CNU" || token == "CNR";
         private bool EsOL(string token) => token == "OL1" || token == "OL2" || token == "OL3";
-        private bool EsOR(string token) => token == "OR1" || token == "OR2" || token == "OR3" || token == "OR4" || token == "OR5" || token == "OR6";
+        private bool EsOLBinario(string token) => token == "OL1" || token == "OL3";
+        private bool EsOR(string token)
+        {
+            if (string.IsNullOrEmpty(token)) return false;
+            if (token.StartsWith("OR")) return true;
+
+            switch (token)
+            {
+                case "MAYOR":
+                case "MENOR":
+                case "IGUAL":
+                case "MAYOR_IGUAL":
+                case "MENOR_IGUAL":
+                case "DISTINTO":
+                case ">=":
+                case "<=":
+                case "<>":
+                case ">":
+                case "<":
+                    return true;
+                default:
+                    return false;
+            }
+        }
         private bool EsOA(string token) =>
             token == "OA1" || token == "OA2" || token == "OA3" || token == "OA4" || token == "OA5"
             || token == "MAS" || token == "MENOS" || token == "ASTERISCO" || token == "SLASH";
@@ -1040,8 +1160,8 @@
         public string Tipo { get; set; } = "";
         public string Valor { get; set; } = "";
         public int Linea { get; set; }
-        // Memory info
         public int Address { get; set; }
         public int Size { get; set; }
+        public string Ambito { get; set; } = "Global";
     }
 }
