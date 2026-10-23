@@ -4,7 +4,8 @@ namespace AnalizadorLexico
     {
         private Recorrido r = new();
         private AnalizadorSintactico _sintactico = new();
-        private AnalizadorSemantico _semantico = new(); 
+        private AnalizadorSemantico _semantico = new();
+
         public Form1()
         {
             InitializeComponent();
@@ -14,6 +15,9 @@ namespace AnalizadorLexico
             btnGuardar.Click += btnGuardarPrograma_Click;
             btnGuardarTokens.Click += btnGuardarTokens_Click;
             btnSintaxis.Click += btnSintaxis_Click;
+            btnGenerar.Click += btnGenerar_Click;
+            btnLimpiar.Click += btnLimpiar_Click;
+            btnCopiar.Click += btnCopiar_Click;
 
             rtxPrograma.KeyDown += rtxPrograma_KeyDown;
             rtxPrograma.AcceptsTab = true;
@@ -28,7 +32,196 @@ namespace AnalizadorLexico
             rtxPrograma.TextChanged += (s, e) => ActualizarNumerosLinea();
             rtxPrograma.VScroll += (s, e) => SincronizarScroll();
 
+            richTextBox2.Text = rtxPrograma.Text;
         }
+
+        private void btnGenerar_Click(object? sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(rtxPrograma.Text))
+            {
+                MessageBox.Show("Ingrese un programa para generar la representación intermedia.", "Aviso",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            var texto = rtxPrograma.Text.Trim();
+            var (tokens, erroresLexicos, _) = r.AnalizarPrograma(texto);
+
+            rtxTokens.Clear();
+            var tokensPorLinea = tokens.GroupBy(t => t.linea).OrderBy(g => g.Key);
+            foreach (var grupo in tokensPorLinea)
+            {
+                var tokensLinea = grupo.Select(t => t.token).ToList();
+                string lineaTokens = string.Join(" ", tokensLinea);
+                bool tieneError = grupo.Any(t => t.token == "ERROR");
+
+                rtxTokens.SelectionColor = tieneError ? Color.Red : Color.Black;
+                rtxTokens.AppendText($"{grupo.Key}. {lineaTokens}\n");
+            }
+
+            dgvErrores.Rows.Clear();
+            foreach (var (linea, valor, error) in erroresLexicos)
+                dgvErrores.Rows.Add(linea, $"'{valor}' - {error}");
+
+            lblErrores.Text = $"Total errores: {erroresLexicos.Count}";
+
+            if (erroresLexicos.Count > 0)
+            {
+                MessageBox.Show("Error léxico detectado. Corrija los errores antes de generar el código intermedio.", "Error léxico",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                tabControl1.SelectedTab = tabPage1;
+                return;
+            }
+
+            bool sintaxisValida = _sintactico.Analizar(tokens);
+            rtxSintaxis.Clear();
+            dgvSintaxis.Rows.Clear();
+
+            if (!sintaxisValida)
+            {
+                rtxSintaxis.SelectionColor = Color.Red;
+                foreach (string error in _sintactico.Errores)
+                {
+                    rtxSintaxis.AppendText(error + "\n");
+
+                    string linea = "-";
+                    int idx = error.LastIndexOf("línea ");
+                    if (idx >= 0)
+                    {
+                        string resto = error.Substring(idx + 6);
+                        string numStr = new string(resto.TakeWhile(char.IsDigit).ToArray());
+                        if (!string.IsNullOrEmpty(numStr)) linea = numStr;
+                    }
+                    dgvSintaxis.Rows.Add(linea, error);
+                }
+
+                MessageBox.Show("Error sintáctico detectado. Debe corregir la sintaxis antes de generar el código intermedio.", "Error sintáctico",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                tabControl1.SelectedTab = tabPage2;
+                return;
+            }
+
+            rtxSintaxis.SelectionColor = Color.Green;
+            rtxSintaxis.AppendText("Análisis sintáctico completado: Programa aceptado, sin errores.");
+
+            _semantico.AstRoot = _sintactico.AstRoot;
+            bool semanticaValida = _semantico.Analizar(tokens);
+            richTextBox1.Clear();
+            dgvSemantica.Rows.Clear();
+            dgvTablaSimbolos.Rows.Clear();
+
+            if (!semanticaValida)
+            {
+                richTextBox1.SelectionColor = Color.Red;
+                foreach (string error in _semantico.Errores)
+                {
+                    richTextBox1.AppendText(error + "\n");
+
+                    string linea = "-";
+                    int idx = error.LastIndexOf("línea ");
+                    if (idx >= 0)
+                    {
+                        string resto = error.Substring(idx + 6);
+                        string numStr = new string(resto.TakeWhile(char.IsDigit).ToArray());
+                        if (!string.IsNullOrEmpty(numStr)) linea = numStr;
+                    }
+                    dgvSemantica.Rows.Add(linea, error);
+                }
+
+                foreach (var simbolo in _semantico.TablaSimbolosFinal)
+                {
+                    dgvTablaSimbolos.Rows.Add(
+                        simbolo.Id,
+                        simbolo.Nombre,
+                        simbolo.Tipo,
+                        simbolo.Valor,
+                        simbolo.Ambito,
+                        simbolo.Address);
+                }
+
+                MessageBox.Show("Error semántico detectado. Debe corregir la semántica antes de generar el código intermedio.", "Error semántico",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                tabControl1.SelectedTab = tabPage3;
+                return;
+            }
+
+            richTextBox1.SelectionColor = Color.Green;
+            richTextBox1.AppendText("Análisis semántico completado: Programa aceptado, sin errores de tipos.");
+
+            foreach (var simbolo in _semantico.TablaSimbolosFinal)
+            {
+                dgvTablaSimbolos.Rows.Add(
+                    simbolo.Id,
+                    simbolo.Nombre,
+                    simbolo.Tipo,
+                    simbolo.Valor,
+                    simbolo.Ambito,
+                    simbolo.Address);
+            }
+
+            richTextBox2.Text = rtxPrograma.Text;
+            richErrores.Clear();
+
+            var generador = new CodigoIntermedio();
+            var cuadruplos = generador.GenerarDesdeTexto(rtxPrograma.Text);
+
+            if (generador.Errores.Count > 0)
+            {
+                richErrores.Text = string.Join(Environment.NewLine, generador.Errores);
+                dgvCuadruplos.Rows.Clear();
+                MessageBox.Show("Se detectaron errores de generación de código intermedio. Revisa el panel de errores.", "Error de generación",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                tabControl1.SelectedTab = tabPage4;
+                return;
+            }
+
+            dgvCuadruplos.Rows.Clear();
+            foreach (var cuadruplo in cuadruplos)
+            {
+                dgvCuadruplos.Rows.Add(
+                    cuadruplo.Numero,
+                    cuadruplo.Operador,
+                    cuadruplo.Argumento1,
+                    cuadruplo.Argumento2,
+                    cuadruplo.Resultado);
+            }
+
+            if (cuadruplos.Count == 0)
+            {
+                MessageBox.Show("No hay instrucciones que generar.", "Código intermedio",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                MessageBox.Show("Se generó la representación intermedia correctamente.", "Código intermedio",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+
+            tabControl1.SelectedTab = tabPage4;
+        }
+
+        private void btnLimpiar_Click(object? sender, EventArgs e)
+        {
+            richTextBox2.Clear();
+            richTextBox2.Text = rtxPrograma.Text;
+            richErrores.Clear();
+            dgvCuadruplos.Rows.Clear();
+        }
+
+        private void btnCopiar_Click(object? sender, EventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(richTextBox2.Text))
+            {
+                MessageBox.Show("No hay contenido para copiar.", "Código intermedio",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            Clipboard.SetText(richTextBox2.Text);
+            MessageBox.Show("Se copió el contenido al portapapeles.", "Código intermedio",
+                MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void btnAnalizar_Click(object? sender, EventArgs e)
         {
             btnAnalizar.Enabled = false;

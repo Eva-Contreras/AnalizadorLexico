@@ -381,14 +381,11 @@
         private void ParseOPL()
         {
             Pasos.Add("[OPL] Operación lógica...");
-            // Parse left side of logical operation
             ParseCondicionBase();
-            // zero or more (logical-operator condition) sequences
             while (EsOLBinario(TokenActual.token))
             {
                 Pasos.Add($"[OL] '{TokenActual.valor}' ({TokenActual.token})");
                 Avanzar();
-                // after consuming the operator, parse the right-side condition
                 ParseCondicionBase();
             }
             Pasos.Add("[OPL] Operación lógica reconocida ✔");

@@ -5,8 +5,8 @@ namespace AnalizadorLexico
     public class Recorrido
     {
         // Cadena de conexión
-        //protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
-        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        //protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -290,8 +290,8 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-                  return "_" + c.ToString(); 
-                //return c.ToString();
+              //return "_" + c.ToString();
+            return c.ToString();
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
@@ -456,31 +456,6 @@ namespace AnalizadorLexico
                     tokens.Add(palabra);
                     continue;
                 }
-
-                /*if (char.IsLetter(c))
-                {
-                    string palabra = "";
-                    while (i < linea.Length)
-                    {
-                        char actual = linea[i];
-                        if (char.IsLetterOrDigit(actual))
-                        {
-                            palabra += actual;
-                            i++;
-                        }
-                        else if (EsCaracterEspecial(actual) && !char.IsWhiteSpace(actual))
-                        {
-                            palabra += actual;
-                            i++;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-                    tokens.Add(palabra);
-                    continue;
-                }*/
 
                 if ((c == '+' || c == '-') && i + 1 < linea.Length && char.IsDigit(linea[i + 1]))
                 {
