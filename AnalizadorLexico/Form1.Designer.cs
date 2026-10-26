@@ -95,10 +95,9 @@
             pictureBox3 = new PictureBox();
             tabPage4 = new TabPage();
             groupBox4 = new GroupBox();
+            label9 = new Label();
             richTextBox2 = new RichTextBox();
             label7 = new Label();
-            label8 = new Label();
-            richErrores = new RichTextBox();
             dgvCuadruplos = new DataGridView();
             No = new DataGridViewTextBoxColumn();
             Operador = new DataGridViewTextBoxColumn();
@@ -110,7 +109,6 @@
             btnGenerar = new Button();
             label6 = new Label();
             pictureBox4 = new PictureBox();
-            label9 = new Label();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvSimbolos).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvErrores).BeginInit();
@@ -827,8 +825,6 @@
             groupBox4.Controls.Add(label9);
             groupBox4.Controls.Add(richTextBox2);
             groupBox4.Controls.Add(label7);
-            groupBox4.Controls.Add(label8);
-            groupBox4.Controls.Add(richErrores);
             groupBox4.Controls.Add(dgvCuadruplos);
             groupBox4.Controls.Add(btnCopiar);
             groupBox4.Controls.Add(btnLimpiar);
@@ -840,6 +836,16 @@
             groupBox4.TabIndex = 11;
             groupBox4.TabStop = false;
             groupBox4.Text = "Generación de Código Intermedio";
+            // 
+            // label9
+            // 
+            label9.AutoSize = true;
+            label9.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label9.Location = new Point(488, 476);
+            label9.Name = "label9";
+            label9.Size = new Size(118, 28);
+            label9.TabIndex = 9;
+            label9.Text = "Cuadruplos";
             // 
             // richTextBox2
             // 
@@ -859,25 +865,6 @@
             label7.Size = new Size(235, 28);
             label7.TabIndex = 4;
             label7.Text = "Código Fuente Validado";
-            // 
-            // label8
-            // 
-            label8.AutoSize = true;
-            label8.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label8.Location = new Point(723, 468);
-            label8.Name = "label8";
-            label8.Size = new Size(219, 28);
-            label8.TabIndex = 7;
-            label8.Text = "Errores de generación";
-            // 
-            // richErrores
-            // 
-            richErrores.Font = new Font("Segoe UI", 8F, FontStyle.Regular, GraphicsUnit.Point, 0);
-            richErrores.Location = new Point(716, 502);
-            richErrores.Name = "richErrores";
-            richErrores.Size = new Size(400, 279);
-            richErrores.TabIndex = 8;
-            richErrores.Text = "";
             // 
             // dgvCuadruplos
             // 
@@ -899,10 +886,10 @@
             dataGridViewCellStyle10.SelectionForeColor = SystemColors.HighlightText;
             dataGridViewCellStyle10.WrapMode = DataGridViewTriState.False;
             dgvCuadruplos.DefaultCellStyle = dataGridViewCellStyle10;
-            dgvCuadruplos.Location = new Point(0, 502);
+            dgvCuadruplos.Location = new Point(51, 517);
             dgvCuadruplos.Name = "dgvCuadruplos";
             dgvCuadruplos.RowHeadersWidth = 62;
-            dgvCuadruplos.Size = new Size(710, 279);
+            dgvCuadruplos.Size = new Size(995, 279);
             dgvCuadruplos.TabIndex = 3;
             // 
             // No
@@ -996,16 +983,6 @@
             pictureBox4.SizeMode = PictureBoxSizeMode.StretchImage;
             pictureBox4.TabIndex = 9;
             pictureBox4.TabStop = false;
-            // 
-            // label9
-            // 
-            label9.AutoSize = true;
-            label9.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label9.Location = new Point(6, 471);
-            label9.Name = "label9";
-            label9.Size = new Size(118, 28);
-            label9.TabIndex = 9;
-            label9.Text = "Cuadruplos";
             // 
             // Form1
             // 
@@ -1115,9 +1092,7 @@
         private Button btnGenerar;
         private DataGridView dgvCuadruplos;
         private Label label7;
-        private Label label8;
         private RichTextBox richTextBox2;
-        private RichTextBox richErrores;
         private DataGridViewTextBoxColumn No;
         private DataGridViewTextBoxColumn Operador;
         private DataGridViewTextBoxColumn Arg1;

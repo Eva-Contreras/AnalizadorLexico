@@ -160,20 +160,9 @@ namespace AnalizadorLexico
             }
 
             richTextBox2.Text = rtxPrograma.Text;
-            richErrores.Clear();
 
             var generador = new CodigoIntermedio();
             var cuadruplos = generador.GenerarDesdeTexto(rtxPrograma.Text);
-
-            if (generador.Errores.Count > 0)
-            {
-                richErrores.Text = string.Join(Environment.NewLine, generador.Errores);
-                dgvCuadruplos.Rows.Clear();
-                MessageBox.Show("Se detectaron errores de generación de código intermedio. Revisa el panel de errores.", "Error de generación",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                tabControl1.SelectedTab = tabPage4;
-                return;
-            }
 
             dgvCuadruplos.Rows.Clear();
             foreach (var cuadruplo in cuadruplos)
@@ -204,7 +193,6 @@ namespace AnalizadorLexico
         {
             richTextBox2.Clear();
             richTextBox2.Text = rtxPrograma.Text;
-            richErrores.Clear();
             dgvCuadruplos.Rows.Clear();
         }
 

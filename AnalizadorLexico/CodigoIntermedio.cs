@@ -17,13 +17,11 @@ namespace AnalizadorLexico
         private int _contadorTemporales;
         private int _contadorEtiquetas;
 
-        public List<string> Errores { get; } = new();
         public List<Cuadruplo> Cuadruplos => new(_cuadruplos);
 
         public List<Cuadruplo> GenerarDesdeTexto(string codigoFuente)
         {
             _cuadruplos.Clear();
-            Errores.Clear();
             _contadorTemporales = 0;
             _contadorEtiquetas = 0;
 
@@ -50,7 +48,7 @@ namespace AnalizadorLexico
                     if (!Regex.IsMatch(texto, @"^(?:\{|\}|LEER\s*\(|IMPRIMIR\s*\(|PARA\s*\()") &&
                         !Regex.IsMatch(texto, @"^(?:LEER|IMPRIMIR|PARA|ENT|DEC|CAD)\b", RegexOptions.IgnoreCase))
                     {
-                        Errores.Add($"Error de generación: sentencia no soportada en la línea '{texto}'.");
+                        continue;
                     }
                     continue;
                 }
@@ -60,14 +58,12 @@ namespace AnalizadorLexico
 
                 if (string.IsNullOrWhiteSpace(expresion))
                 {
-                    Errores.Add($"Error de generación: expresión vacía en la asignación a '{destino}'.");
                     continue;
                 }
 
                 string resultado = ResolverExpresion(expresion);
                 if (string.IsNullOrWhiteSpace(resultado))
                 {
-                    Errores.Add($"Error de generación: no se pudo generar la expresión '{expresion}'.");
                     continue;
                 }
 
@@ -114,7 +110,6 @@ namespace AnalizadorLexico
             var tokens = TokenizarExpresion(expresion);
             if (tokens.Count == 0)
             {
-                Errores.Add($"Error de generación: expresión vacía o no válida '{expresion}'.");
                 return string.Empty;
             }
 
@@ -123,7 +118,6 @@ namespace AnalizadorLexico
 
             if (indice < tokens.Count)
             {
-                Errores.Add($"Error de generación: expresión no soportada en la generación de cuádruplos: '{expresion}'.");
                 return string.Empty;
             }
 
