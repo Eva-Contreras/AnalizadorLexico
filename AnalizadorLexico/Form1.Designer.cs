@@ -98,6 +98,9 @@
             pictureBox3 = new PictureBox();
             tabPage4 = new TabPage();
             groupBox4 = new GroupBox();
+            label7 = new Label();
+            richTextBox6 = new RichTextBox();
+            richTextBox2 = new RichTextBox();
             richTextBox5 = new RichTextBox();
             label12 = new Label();
             richTextBox4 = new RichTextBox();
@@ -120,9 +123,6 @@
             btnGenerar = new Button();
             label6 = new Label();
             pictureBox4 = new PictureBox();
-            richTextBox2 = new RichTextBox();
-            richTextBox6 = new RichTextBox();
-            label7 = new Label();
             groupBox1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dgvSimbolos).BeginInit();
             ((System.ComponentModel.ISupportInitialize)dgvErrores).BeginInit();
@@ -859,10 +859,38 @@
             groupBox4.TabStop = false;
             groupBox4.Text = "Generación de Código Intermedio";
             // 
+            // label7
+            // 
+            label7.AutoSize = true;
+            label7.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            label7.Location = new Point(435, 341);
+            label7.Name = "label7";
+            label7.Size = new Size(238, 28);
+            label7.TabIndex = 20;
+            label7.Text = "Código de 3 direcciones";
+            // 
+            // richTextBox6
+            // 
+            richTextBox6.Font = new Font("Segoe UI", 8F);
+            richTextBox6.Location = new Point(568, 385);
+            richTextBox6.Name = "richTextBox6";
+            richTextBox6.Size = new Size(349, 178);
+            richTextBox6.TabIndex = 19;
+            richTextBox6.Text = "";
+            // 
+            // richTextBox2
+            // 
+            richTextBox2.Font = new Font("Segoe UI", 8F);
+            richTextBox2.Location = new Point(156, 385);
+            richTextBox2.Name = "richTextBox2";
+            richTextBox2.Size = new Size(349, 178);
+            richTextBox2.TabIndex = 18;
+            richTextBox2.Text = "";
+            // 
             // richTextBox5
             // 
             richTextBox5.Font = new Font("Segoe UI", 8F);
-            richTextBox5.Location = new Point(759, 611);
+            richTextBox5.Location = new Point(381, 611);
             richTextBox5.Name = "richTextBox5";
             richTextBox5.Size = new Size(349, 178);
             richTextBox5.TabIndex = 17;
@@ -881,7 +909,7 @@
             // richTextBox4
             // 
             richTextBox4.Font = new Font("Segoe UI", 8F);
-            richTextBox4.Location = new Point(392, 611);
+            richTextBox4.Location = new Point(750, 611);
             richTextBox4.Name = "richTextBox4";
             richTextBox4.Size = new Size(349, 178);
             richTextBox4.TabIndex = 15;
@@ -1092,34 +1120,6 @@
             pictureBox4.SizeMode = PictureBoxSizeMode.StretchImage;
             pictureBox4.TabIndex = 9;
             pictureBox4.TabStop = false;
-            // 
-            // richTextBox2
-            // 
-            richTextBox2.Font = new Font("Segoe UI", 8F);
-            richTextBox2.Location = new Point(156, 385);
-            richTextBox2.Name = "richTextBox2";
-            richTextBox2.Size = new Size(349, 178);
-            richTextBox2.TabIndex = 18;
-            richTextBox2.Text = "";
-            // 
-            // richTextBox6
-            // 
-            richTextBox6.Font = new Font("Segoe UI", 8F);
-            richTextBox6.Location = new Point(587, 385);
-            richTextBox6.Name = "richTextBox6";
-            richTextBox6.Size = new Size(349, 178);
-            richTextBox6.TabIndex = 19;
-            richTextBox6.Text = "";
-            // 
-            // label7
-            // 
-            label7.AutoSize = true;
-            label7.Font = new Font("Segoe UI", 10F, FontStyle.Bold, GraphicsUnit.Point, 0);
-            label7.Location = new Point(435, 341);
-            label7.Name = "label7";
-            label7.Size = new Size(238, 28);
-            label7.TabIndex = 20;
-            label7.Text = "Código de 3 direcciones";
             // 
             // Form1
             // 

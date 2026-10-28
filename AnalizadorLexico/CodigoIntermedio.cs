@@ -17,6 +17,9 @@ namespace AnalizadorLexico
 
     public class Triplo
     {
+        // Se conserva Resultado para mostrar el destino real del triple.
+        // La semántica del triple sigue siendo (operador, argumento1, argumento2),
+        // con el resultado asociado a la variable o temporal que lo recibe.
         public int Numero { get; set; }
         public string Operador { get; set; } = string.Empty;
         public string Argumento1 { get; set; } = string.Empty;
@@ -212,9 +215,11 @@ namespace AnalizadorLexico
             }
 
             // Notacion postfija.
-            List<string> postfija = new();
+            List<string> postfija = new()
+            {
+                destino
+            };
             GenerarPostfija(arbol, postfija);
-            postfija.Add(destino);
             postfija.Add("=");
 
             _notacionPostfija.Add(string.Join(" ", postfija));
@@ -230,24 +235,11 @@ namespace AnalizadorLexico
 
             _notacionPrefija.Add(string.Join(" ", prefija));
 
-            // Codigo P.
+            // Codigo P._codigoP.Add($"lda {destino}");
+
             GenerarCodigoP(arbol);
 
-            if (valorCalculado.HasValue)
-            {
-                _codigoP.Add(
-                    $"; Resultado de la operacion: {FormatoNumero(valorCalculado.Value)}"
-                );
-            }
-
-            _codigoP.Add($"STO {destino}");
-
-            if (_valoresVariables.TryGetValue(destino, out double valorFinal))
-            {
-                _codigoP.Add(
-                    $"; {destino} = {FormatoNumero(valorFinal)}"
-                );
-            }
+            _codigoP.Add($"sto {destino}");
         }
 
         // =====================================================
@@ -590,7 +582,7 @@ namespace AnalizadorLexico
         {
             _triplos.Clear();
 
-            Dictionary<string, int> referencias = new();
+            Dictionary<string, int> referencias = new(StringComparer.OrdinalIgnoreCase);
 
             foreach (Cuadruplo cuadruplo in _cuadruplos)
             {
@@ -604,30 +596,34 @@ namespace AnalizadorLexico
                     referencias
                 );
 
-                int numeroTriplo = _triplos.Count;
-
                 if (cuadruplo.Operador == "=")
                 {
-                    argumento2 = cuadruplo.Resultado;
+                    _triplos.Add(new Triplo
+                    {
+                        Numero = _triplos.Count,
+                        Operador = cuadruplo.Operador,
+                        Argumento1 = argumento1,
+                        Argumento2 = string.Empty,
+                        Resultado = cuadruplo.Resultado
+                    });
+
+                    continue;
                 }
 
                 _triplos.Add(new Triplo
                 {
-                    Numero = numeroTriplo,
+                    Numero = _triplos.Count,
                     Operador = cuadruplo.Operador,
                     Argumento1 = argumento1,
                     Argumento2 = argumento2,
-                    Resultado = cuadruplo.Operador == "="
-                        ? string.Empty
-                        : cuadruplo.Resultado
+                    Resultado = cuadruplo.Resultado
                 });
 
                 if (cuadruplo.Resultado.StartsWith(
                         "t",
-                        StringComparison.OrdinalIgnoreCase) &&
-                    cuadruplo.Operador != "=")
+                        StringComparison.OrdinalIgnoreCase))
                 {
-                    referencias[cuadruplo.Resultado] = numeroTriplo;
+                    referencias[cuadruplo.Resultado] = _triplos.Count - 1;
                 }
             }
         }
@@ -689,17 +685,17 @@ namespace AnalizadorLexico
                 if (t.Operador == "=")
                 {
                     instruccion =
-                        $"{t.Argumento2} = {t.Argumento1}";
+                        $"{t.Resultado} = {t.Argumento1}";
                 }
                 else if (t.Operador == "NEG")
                 {
                     instruccion =
-                        $"t{t.Numero + 1} = -{t.Argumento1}";
+                        $"-{t.Argumento1}";
                 }
                 else
                 {
                     instruccion =
-                        $"t{t.Numero + 1} = {t.Argumento1} {t.Operador} {t.Argumento2}";
+                        $"{t.Argumento1} {t.Operador} {t.Argumento2}";
                 }
 
                 _codigoTresDireccionesTriplos.Add(
@@ -755,43 +751,86 @@ namespace AnalizadorLexico
         // =====================================================
         // CODIGO P
         // =====================================================
+        // =====================================================
+
+        // CODIGO P
+
+        // =====================================================
+
         private void GenerarCodigoP(NodoExpresion nodo)
+
         {
+
             if (nodo.EsOperando)
+
             {
+
                 if (EsCadena(nodo.Valor) || EsNumero(nodo.Valor))
-                    _codigoP.Add($"LDC {nodo.Valor}");
+
+                {
+
+                    _codigoP.Add($"ldc {nodo.Valor}");
+
+                }
+
                 else
-                    _codigoP.Add($"LDV {nodo.Valor}");
+
+                {
+
+                    _codigoP.Add($"lod {nodo.Valor}");
+
+                }
 
                 return;
+
             }
 
             if (nodo.Izquierda != null)
+
                 GenerarCodigoP(nodo.Izquierda);
 
             if (nodo.Derecha != null)
+
                 GenerarCodigoP(nodo.Derecha);
 
             switch (nodo.Operador)
+
             {
+
                 case "+":
-                    _codigoP.Add("ADD");
+
+                    _codigoP.Add("adi");
+
                     break;
+
                 case "-":
-                    _codigoP.Add("SUB");
+
+                    _codigoP.Add("sbi");
+
                     break;
+
                 case "*":
-                    _codigoP.Add("MUL");
+
+                    _codigoP.Add("mli");
+
                     break;
+
                 case "/":
-                    _codigoP.Add("DIV");
+
+                    _codigoP.Add("dvi");
+
                     break;
+
                 case "NEG":
-                    _codigoP.Add("NEG");
+
+                    _codigoP.Add("ngi");
+
                     break;
+
             }
+
         }
+
 
         // =====================================================
         // EVALUAR EXPRESIONES NUMERICAS
@@ -852,6 +891,7 @@ namespace AnalizadorLexico
                 default:
                     return null;
             }
+
         }
 
         // =====================================================
