@@ -840,43 +840,33 @@
 
         private string ParseOPA()
         {
-            if (TokenActual.token == "CD3")
+            string tipo1 = ParseARG4();
+            while (EsOA(TokenActual.token))
             {
-                Consumir("CD3", "Se esperaba '('");
-                string tipoResult = ParseOPA();
-                Consumir("CD4", "Se esperaba ')' después de OPA");
-                return tipoResult;
-            }
-            else
-            {
-                string tipo1 = ParseARG4();
-                if (EsOA(TokenActual.token))
+                string opToken = TokenActual.token;
+                string opValor = TokenActual.valor;
+                Consumir(TokenActual.token, "Se esperaba operador aritmético");
+                string tipo2 = ParseARG4();
+
+                if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
+
+                bool esMas = opValor == "+" || opToken == "OA1" || opToken == "MAS";
+                if (esMas && (tipo1 == "CAD" || tipo2 == "CAD"))
                 {
-                    string opToken = TokenActual.token;
-                    string opValor = TokenActual.valor;
-                    Consumir(TokenActual.token, "Se esperaba operador aritmético");
-                    string tipo2 = ParseARG4();
-
-                    if (tipo1 == "ERROR" || tipo2 == "ERROR") return "ERROR";
-
-                    bool esMas = opValor == "+" || opToken == "OA1" || opToken == "MAS";
-                    if (esMas && (tipo1 == "CAD" || tipo2 == "CAD"))
-                    {
-                        return "CAD";
-                    }
-
-                    if (!EsNumerico(tipo1) || !EsNumerico(tipo2))
-                    {
-                        Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipo1} y {tipo2}");
-                        return "ERROR";
-                    }
-
-                    if (tipo1 == "DEC" || tipo2 == "DEC")
-                        return "DEC";
-                    return "ENT";
+                    tipo1 = "CAD";
+                    continue;
                 }
-                return tipo1;
+
+                if (!EsNumerico(tipo1) || !EsNumerico(tipo2))
+                {
+                    Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipo1} y {tipo2}");
+                    return "ERROR";
+                }
+
+                tipo1 = tipo1 == "DEC" || tipo2 == "DEC" ? "DEC" : "ENT";
             }
+
+            return tipo1;
         }
 
         private string ParseARG4()
