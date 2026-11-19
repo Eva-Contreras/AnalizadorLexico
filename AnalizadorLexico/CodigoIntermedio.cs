@@ -17,9 +17,7 @@ namespace AnalizadorLexico
 
     public class Triplo
     {
-        // Se conserva Resultado para mostrar el destino real del triple.
-        // La semántica del triple sigue siendo (operador, argumento1, argumento2),
-        // con el resultado asociado a la variable o temporal que lo recibe.
+
         public int Numero { get; set; }
         public string Operador { get; set; } = string.Empty;
         public string Argumento1 { get; set; } = string.Empty;
@@ -115,7 +113,7 @@ namespace AnalizadorLexico
                 if (string.IsNullOrWhiteSpace(texto))
                     continue;
 
-                // Estas instrucciones todavía no se traducen.
+                
                 if (texto == "{" || texto == "}" ||
                     Regex.IsMatch(
                         texto,
@@ -235,7 +233,7 @@ namespace AnalizadorLexico
 
             _notacionPrefija.Add(string.Join(" ", prefija));
 
-            // Codigo P._codigoP.Add($"lda {destino}");
+            
 
             GenerarCodigoP(arbol);
 
@@ -751,11 +749,7 @@ namespace AnalizadorLexico
         // =====================================================
         // CODIGO P
         // =====================================================
-        // =====================================================
-
-        // CODIGO P
-
-        // =====================================================
+     
 
         private void GenerarCodigoP(NodoExpresion nodo)
 
