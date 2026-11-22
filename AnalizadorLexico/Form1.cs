@@ -231,7 +231,7 @@ namespace AnalizadorLexico
             CodigoIntermedio generador = new();
 
             var cuadruplos =
-                generador.GenerarDesdeTexto(rtxPrograma.Text);
+                generador.GenerarDesdeAst(_sintactico.AstRoot);
 
             // ----------------------------------------------------
             // 4.1 CUADRUPLOS

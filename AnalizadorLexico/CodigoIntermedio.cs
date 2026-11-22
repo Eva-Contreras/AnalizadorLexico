@@ -83,6 +83,18 @@ namespace AnalizadorLexico
         // =====================================================
         // GENERAR REPRESENTACIONES
         // =====================================================
+        public List<Cuadruplo> GenerarDesdeAst(ProgramNode programa)
+        {
+            LimpiarResultados();
+            EmitirSentencias(programa.Statements);
+            GenerarTriplos();
+            GenerarCodigoTresDireccionesCuadruplos();
+            GenerarCodigoTresDireccionesTriplos();
+            GenerarCodigoPDesdeCuadruplos();
+            GenerarNotacionesDesdeCuadruplos();
+            return Cuadruplos;
+        }
+
         public List<Cuadruplo> GenerarDesdeTexto(string codigoFuente)
         {
             LimpiarResultados();
@@ -131,6 +143,387 @@ namespace AnalizadorLexico
             GenerarCodigoTresDireccionesTriplos();
 
             return Cuadruplos;
+        }
+
+        private void EmitirSentencias(IEnumerable<AstNode> sentencias)
+        {
+            foreach (AstNode sentencia in sentencias)
+            {
+                switch (sentencia)
+                {
+                    case DeclarationNode declaracion:
+                        EmitirAsignacion(declaracion.Identificador, declaracion.Valor);
+                        break;
+                    case AssignmentNode asignacion:
+                        EmitirAsignacion(asignacion.Identificador, asignacion.Valor);
+                        break;
+                    case BlockNode bloque:
+                        EmitirSentencias(bloque.Statements);
+                        break;
+                    case IfNode condicional:
+                        EmitirIf(condicional);
+                        break;
+                    case WhileNode mientras:
+                        EmitirWhile(mientras);
+                        break;
+                    case DoWhileNode hacerMientras:
+                        EmitirDoWhile(hacerMientras);
+                        break;
+                    case ForNode para:
+                        EmitirFor(para);
+                        break;
+                    case ReadNode lectura:
+                        AgregarCuadruplo("READ", lectura.Identificador, string.Empty, string.Empty);
+                        break;
+                    case PrintNode imprimir:
+                        AgregarCuadruplo("PRINT", EmitirExpresion(imprimir.Valor), string.Empty, string.Empty);
+                        break;
+                    case ReturnNode retornar:
+                        AgregarCuadruplo("RETURN", EmitirExpresion(retornar.Valor), string.Empty, string.Empty);
+                        break;
+                    case SimpleInstructionNode instruccion:
+                        AgregarCuadruplo(instruccion.Operacion, string.Join(", ", instruccion.Argumentos), string.Empty, string.Empty);
+                        break;
+                    case SwitchNode seleccion:
+                        EmitirSwitch(seleccion);
+                        break;
+                }
+            }
+        }
+
+        private void EmitirAsignacion(string destino, AstNode? valor)
+        {
+            string operando = EmitirExpresion(valor);
+            AgregarCuadruplo("=", operando, string.Empty, destino);
+        }
+
+        private void AgregarRepresentacionesDeExpresion(string destino, AstNode? expresion)
+        {
+            List<string> postfija = new() { destino };
+            GenerarPostfijaAst(expresion, postfija);
+            postfija.Add("=");
+            _notacionPostfija.Add(string.Join(" ", postfija));
+
+            List<string> prefija = new() { "=", destino };
+            GenerarPrefijaAst(expresion, prefija);
+            _notacionPrefija.Add(string.Join(" ", prefija));
+
+            GenerarCodigoPAst(expresion);
+            _codigoP.Add($"sto {destino}");
+        }
+
+        private void GenerarPostfijaAst(AstNode? expresion, List<string> salida)
+        {
+            if (expresion is BinaryExpressionNode binaria)
+            {
+                GenerarPostfijaAst(binaria.Izquierda, salida);
+                GenerarPostfijaAst(binaria.Derecha, salida);
+                salida.Add(binaria.Operador);
+            }
+            else if (expresion is UnaryExpressionNode unaria)
+            {
+                GenerarPostfijaAst(unaria.Operando, salida);
+                salida.Add(unaria.Operador == "-" ? "NEG" : "POS");
+            }
+            else
+            {
+                salida.Add(EmitirExpresionLiteral(expresion));
+            }
+        }
+
+        private void GenerarPrefijaAst(AstNode? expresion, List<string> salida)
+        {
+            if (expresion is BinaryExpressionNode binaria)
+            {
+                salida.Add(binaria.Operador);
+                GenerarPrefijaAst(binaria.Izquierda, salida);
+                GenerarPrefijaAst(binaria.Derecha, salida);
+            }
+            else if (expresion is UnaryExpressionNode unaria)
+            {
+                salida.Add(unaria.Operador == "-" ? "NEG" : "POS");
+                GenerarPrefijaAst(unaria.Operando, salida);
+            }
+            else
+            {
+                salida.Add(EmitirExpresionLiteral(expresion));
+            }
+        }
+
+        private void GenerarCodigoPAst(AstNode? expresion)
+        {
+            if (expresion is BinaryExpressionNode binaria)
+            {
+                GenerarCodigoPAst(binaria.Izquierda);
+                GenerarCodigoPAst(binaria.Derecha);
+                string? operacion = binaria.Operador switch
+                {
+                    "+" => "adi",
+                    "-" => "sbi",
+                    "*" => "mli",
+                    "/" => "dvi",
+                    _ => null
+                };
+                if (operacion != null) _codigoP.Add(operacion);
+            }
+            else if (expresion is UnaryExpressionNode unaria)
+            {
+                GenerarCodigoPAst(unaria.Operando);
+                if (unaria.Operador == "-") _codigoP.Add("ngi");
+            }
+            else
+            {
+                string operando = EmitirExpresionLiteral(expresion);
+                _codigoP.Add(EsNumero(operando) || EsCadena(operando) ? $"ldc {operando}" : $"lod {operando}");
+            }
+        }
+
+        private string EmitirExpresionLiteral(AstNode? expresion)
+        {
+            return expresion switch
+            {
+                IdentifierNode identificador => identificador.Nombre,
+                LiteralNode literal => literal.Valor,
+                RawExpressionNode raw => raw.Texto,
+                _ => string.Empty
+            };
+        }
+
+        private string EmitirCondicion(AstNode? condicion)
+        {
+            if (condicion == null)
+                throw new InvalidOperationException("No se pudo construir una expresión booleana válida desde el AST.");
+
+            if (condicion is UnaryExpressionNode unaria && unaria.Operador == "NO")
+            {
+                string operandoNegado = EmitirCondicion(unaria.Operando);
+                string resultadoNegacion = NuevaTemporal();
+                AgregarCuadruplo("NOT", operandoNegado, string.Empty, resultadoNegacion);
+                return resultadoNegacion;
+            }
+
+            if (condicion is BinaryExpressionNode binaria &&
+                (binaria.Operador == "Y" || binaria.Operador == "O"))
+            {
+                string izquierdaLogica = EmitirCondicion(binaria.Izquierda);
+                string derechaLogica = EmitirCondicion(binaria.Derecha);
+                string resultadoLogico = NuevaTemporal();
+                AgregarCuadruplo(binaria.Operador == "Y" ? "AND" : "OR",
+                    izquierdaLogica, derechaLogica, resultadoLogico);
+                return resultadoLogico;
+            }
+
+            return EmitirExpresion(condicion);
+        }
+
+        private string EmitirExpresion(AstNode? expresion)
+        {
+            switch (expresion)
+            {
+                case IdentifierNode identificador:
+                    return identificador.Nombre;
+                case LiteralNode literal:
+                    return literal.Valor;
+                case RawExpressionNode raw:
+                    return raw.Texto;
+                case UnaryExpressionNode unaria:
+                    string operando = EmitirExpresion(unaria.Operando);
+                    string temporalUnario = NuevaTemporal();
+                    AgregarCuadruplo(unaria.Operador == "-" ? "NEG" : "POS",
+                        operando, string.Empty, temporalUnario);
+                    return temporalUnario;
+                case BinaryExpressionNode binaria:
+                    string izquierda = EmitirExpresion(binaria.Izquierda);
+                    string derecha = EmitirExpresion(binaria.Derecha);
+                    string temporal = NuevaTemporal();
+                    AgregarCuadruplo(binaria.Operador, izquierda, derecha, temporal);
+                    return temporal;
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private void GenerarCodigoPDesdeCuadruplos()
+        {
+            _codigoP.Clear();
+            foreach (Cuadruplo instruccion in _cuadruplos)
+            {
+                switch (instruccion.Operador)
+                {
+                    case "=":
+                        CargarOperando(instruccion.Argumento1);
+                        _codigoP.Add($"sto {instruccion.Resultado}");
+                        break;
+                    case "NEG":
+                    case "NOT":
+                    case "POS":
+                        CargarOperando(instruccion.Argumento1);
+                        _codigoP.Add(instruccion.Operador switch { "NEG" => "ngi", "NOT" => "not", _ => "nop" });
+                        _codigoP.Add($"sto {instruccion.Resultado}");
+                        break;
+                    case "+": case "-": case "*": case "/":
+                    case ">": case "<": case ">=": case "<=": case "==": case "!=":
+                    case "AND": case "OR":
+                        CargarOperando(instruccion.Argumento1);
+                        CargarOperando(instruccion.Argumento2);
+                        _codigoP.Add(instruccion.Operador switch
+                        {
+                            "+" => "adi", "-" => "sbi", "*" => "mli", "/" => "dvi",
+                            ">" => "grt", "<" => "les", ">=" => "geq", "<=" => "leq",
+                            "==" => "equ", "!=" => "neq", "AND" => "and", _ => "or"
+                        });
+                        _codigoP.Add($"sto {instruccion.Resultado}");
+                        break;
+                    case "LABEL":
+                        _codigoP.Add($"{instruccion.Resultado}:");
+                        break;
+                    case "GOTO":
+                        _codigoP.Add($"jmp {instruccion.Resultado}");
+                        break;
+                    case "IF_FALSE": case "IF_TRUE":
+                        CargarOperando(instruccion.Argumento1);
+                        _codigoP.Add($"{(instruccion.Operador == "IF_FALSE" ? "jmf" : "jmt")} {instruccion.Resultado}");
+                        break;
+                    case "READ":
+                        _codigoP.Add($"inp {instruccion.Argumento1}");
+                        break;
+                    case "PRINT":
+                        CargarOperando(instruccion.Argumento1);
+                        _codigoP.Add("out");
+                        break;
+                    case "RETURN":
+                        if (!string.IsNullOrEmpty(instruccion.Argumento1)) CargarOperando(instruccion.Argumento1);
+                        _codigoP.Add("ret");
+                        break;
+                    case "CLEAR":
+                        _codigoP.Add("clr");
+                        break;
+                    case "LOCATE":
+                        _codigoP.Add($"loc {instruccion.Argumento1}");
+                        break;
+                }
+            }
+        }
+
+        private void CargarOperando(string operando)
+        {
+            _codigoP.Add(EsNumero(operando) || EsCadena(operando) ? $"ldc {operando}" : $"lod {operando}");
+        }
+
+        private void GenerarNotacionesDesdeCuadruplos()
+        {
+            _notacionPrefija.Clear();
+            _notacionPostfija.Clear();
+            foreach (Cuadruplo instruccion in _cuadruplos)
+            {
+                bool binaria = instruccion.Operador is "+" or "-" or "*" or "/" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR";
+                if (instruccion.Operador == "=")
+                {
+                    _notacionPrefija.Add($"= {instruccion.Resultado} {instruccion.Argumento1}");
+                    _notacionPostfija.Add($"{instruccion.Resultado} {instruccion.Argumento1} =");
+                }
+                else if (binaria)
+                {
+                    _notacionPrefija.Add($"{instruccion.Operador} {instruccion.Argumento1} {instruccion.Argumento2} {instruccion.Resultado}");
+                    _notacionPostfija.Add($"{instruccion.Argumento1} {instruccion.Argumento2} {instruccion.Operador} {instruccion.Resultado}");
+                }
+                else if (instruccion.Operador == "NEG" || instruccion.Operador == "NOT")
+                {
+                    _notacionPrefija.Add($"{instruccion.Operador} {instruccion.Argumento1} {instruccion.Resultado}");
+                    _notacionPostfija.Add($"{instruccion.Argumento1} {instruccion.Operador} {instruccion.Resultado}");
+                }
+                else if (instruccion.Operador == "LABEL")
+                {
+                    _notacionPrefija.Add($"LABEL {instruccion.Resultado}");
+                    _notacionPostfija.Add($"{instruccion.Resultado} LABEL");
+                }
+                else if (instruccion.Operador == "GOTO")
+                {
+                    _notacionPrefija.Add($"GOTO {instruccion.Resultado}");
+                    _notacionPostfija.Add($"{instruccion.Resultado} GOTO");
+                }
+                else if (instruccion.Operador == "IF_FALSE" || instruccion.Operador == "IF_TRUE")
+                {
+                    _notacionPrefija.Add($"{instruccion.Operador} {instruccion.Argumento1} {instruccion.Resultado}");
+                    _notacionPostfija.Add($"{instruccion.Argumento1} {instruccion.Resultado} {instruccion.Operador}");
+                }
+                else
+                {
+                    _notacionPrefija.Add($"{instruccion.Operador} {instruccion.Argumento1}".TrimEnd());
+                    _notacionPostfija.Add($"{instruccion.Argumento1} {instruccion.Operador}".Trim());
+                }
+            }
+        }
+
+        private void EmitirIf(IfNode nodo)
+        {
+            string etiquetaFalsa = NuevaEtiqueta();
+            string etiquetaFin = NuevaEtiqueta();
+            AgregarCuadruplo("IF_FALSE", EmitirCondicion(nodo.Condicion), string.Empty, etiquetaFalsa);
+            EmitirSentencias(nodo.BloqueVerdadero.Statements);
+            if (nodo.BloqueFalso != null)
+            {
+                AgregarCuadruplo("GOTO", string.Empty, string.Empty, etiquetaFin);
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFalsa);
+                EmitirSentencias(nodo.BloqueFalso.Statements);
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFin);
+            }
+            else
+            {
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFalsa);
+            }
+        }
+
+        private void EmitirWhile(WhileNode nodo)
+        {
+            string inicio = NuevaEtiqueta();
+            string fin = NuevaEtiqueta();
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, inicio);
+            AgregarCuadruplo("IF_FALSE", EmitirCondicion(nodo.Condicion), string.Empty, fin);
+            EmitirSentencias(nodo.Cuerpo.Statements);
+            AgregarCuadruplo("GOTO", string.Empty, string.Empty, inicio);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, fin);
+        }
+
+        private void EmitirDoWhile(DoWhileNode nodo)
+        {
+            string inicio = NuevaEtiqueta();
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, inicio);
+            EmitirSentencias(nodo.Cuerpo.Statements);
+            AgregarCuadruplo("IF_TRUE", EmitirCondicion(nodo.Condicion), string.Empty, inicio);
+        }
+
+        private void EmitirFor(ForNode nodo)
+        {
+            if (nodo.Inicializacion != null)
+                EmitirAsignacion(nodo.Inicializacion.Identificador, nodo.Inicializacion.Valor);
+            string inicio = NuevaEtiqueta();
+            string fin = NuevaEtiqueta();
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, inicio);
+            AgregarCuadruplo("IF_FALSE", EmitirCondicion(nodo.Condicion), string.Empty, fin);
+            EmitirSentencias(nodo.Cuerpo.Statements);
+            if (nodo.Incremento != null)
+                EmitirAsignacion(nodo.Incremento.Identificador, nodo.Incremento.Valor);
+            AgregarCuadruplo("GOTO", string.Empty, string.Empty, inicio);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, fin);
+        }
+
+        private void EmitirSwitch(SwitchNode nodo)
+        {
+            string fin = NuevaEtiqueta();
+            foreach (SwitchCaseNode caso in nodo.Casos)
+            {
+                string siguiente = NuevaEtiqueta();
+                string comparacion = NuevaTemporal();
+                AgregarCuadruplo("==", nodo.Selector, EmitirExpresion(caso.Valor), comparacion);
+                AgregarCuadruplo("IF_FALSE", comparacion, string.Empty, siguiente);
+                EmitirSentencias(caso.Cuerpo.Statements);
+                AgregarCuadruplo("GOTO", string.Empty, string.Empty, fin);
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, siguiente);
+            }
+            if (nodo.Predeterminado != null)
+                EmitirSentencias(nodo.Predeterminado.Statements);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, fin);
         }
 
         // =====================================================
@@ -617,9 +1010,7 @@ namespace AnalizadorLexico
                     Resultado = cuadruplo.Resultado
                 });
 
-                if (cuadruplo.Resultado.StartsWith(
-                        "t",
-                        StringComparison.OrdinalIgnoreCase))
+                if (Regex.IsMatch(cuadruplo.Resultado, @"^t\d+$", RegexOptions.IgnoreCase))
                 {
                     referencias[cuadruplo.Resultado] = _triplos.Count - 1;
                 }
@@ -654,11 +1045,27 @@ namespace AnalizadorLexico
                         $"{c.Resultado} = {c.Argumento1}"
                     );
                 }
-                else if (c.Operador == "NEG")
+                else if (c.Operador == "NEG" || c.Operador == "POS" || c.Operador == "NOT")
                 {
-                    _codigoTresDireccionesCuadruplos.Add(
-                        $"{c.Resultado} = -{c.Argumento1}"
-                    );
+                    string operador = c.Operador switch { "NEG" => "-", "POS" => "+", _ => "NOT " };
+                    _codigoTresDireccionesCuadruplos.Add($"{c.Resultado} = {operador}{c.Argumento1}");
+                }
+                else if (c.Operador == "LABEL")
+                {
+                    _codigoTresDireccionesCuadruplos.Add($"{c.Resultado}:");
+                }
+                else if (c.Operador == "GOTO")
+                {
+                    _codigoTresDireccionesCuadruplos.Add($"goto {c.Resultado}");
+                }
+                else if (c.Operador == "IF_FALSE" || c.Operador == "IF_TRUE")
+                {
+                    string condicion = c.Operador == "IF_FALSE" ? "ifFalse" : "ifTrue";
+                    _codigoTresDireccionesCuadruplos.Add($"{condicion} {c.Argumento1} goto {c.Resultado}");
+                }
+                else if (c.Operador == "READ" || c.Operador == "PRINT" || c.Operador == "RETURN" || c.Operador == "CLEAR" || c.Operador == "LOCATE")
+                {
+                    _codigoTresDireccionesCuadruplos.Add($"{c.Operador.ToLowerInvariant()} {c.Argumento1}".TrimEnd());
                 }
                 else
                 {
@@ -685,15 +1092,29 @@ namespace AnalizadorLexico
                     instruccion =
                         $"{t.Resultado} = {t.Argumento1}";
                 }
-                else if (t.Operador == "NEG")
+                else if (t.Operador == "NEG" || t.Operador == "POS" || t.Operador == "NOT")
                 {
-                    instruccion =
-                        $"-{t.Argumento1}";
+                    instruccion = $"{(t.Operador == "NEG" ? "-" : t.Operador == "POS" ? "+" : "NOT ")}{t.Argumento1}";
+                }
+                else if (t.Operador == "LABEL")
+                {
+                    instruccion = $"{t.Resultado}:";
+                }
+                else if (t.Operador == "GOTO")
+                {
+                    instruccion = $"goto {t.Resultado}";
+                }
+                else if (t.Operador == "IF_FALSE" || t.Operador == "IF_TRUE")
+                {
+                    instruccion = $"{(t.Operador == "IF_FALSE" ? "ifFalse" : "ifTrue")} {t.Argumento1} goto {t.Resultado}";
+                }
+                else if (t.Operador == "READ" || t.Operador == "PRINT" || t.Operador == "RETURN" || t.Operador == "CLEAR" || t.Operador == "LOCATE")
+                {
+                    instruccion = $"{t.Operador.ToLowerInvariant()} {t.Argumento1}".TrimEnd();
                 }
                 else
                 {
-                    instruccion =
-                        $"{t.Argumento1} {t.Operador} {t.Argumento2}";
+                    instruccion = $"{t.Argumento1} {t.Operador} {t.Argumento2}".TrimEnd();
                 }
 
                 _codigoTresDireccionesTriplos.Add(

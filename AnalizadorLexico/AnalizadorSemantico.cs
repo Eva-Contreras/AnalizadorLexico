@@ -962,14 +962,60 @@
         {
             if (AstRoot == null) return;
 
-            foreach (var stmt in AstRoot.Statements.OfType<DeclarationNode>())
+            foreach (DeclarationNode declaracion in EnumerarDeclaraciones(AstRoot.Statements))
             {
-                if (stmt.Identificador == id && stmt.MemoryAddress == null)
+                if (declaracion.Identificador == id && declaracion.MemoryAddress == null)
                 {
-                    stmt.MemoryAddress = address;
-                    stmt.Size = size;
+                    declaracion.MemoryAddress = address;
+                    declaracion.Size = size;
                     DebugLog.Add($"AST annotated: decl {id} -> addr={address} size={size}");
                     return;
+                }
+            }
+        }
+
+        private IEnumerable<DeclarationNode> EnumerarDeclaraciones(IEnumerable<AstNode> sentencias)
+        {
+            foreach (AstNode sentencia in sentencias)
+            {
+                if (sentencia is DeclarationNode declaracion)
+                    yield return declaracion;
+                else if (sentencia is BlockNode bloque)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(bloque.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is IfNode condicional)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(condicional.BloqueVerdadero.Statements))
+                        yield return anidada;
+                    if (condicional.BloqueFalso != null)
+                        foreach (DeclarationNode anidada in EnumerarDeclaraciones(condicional.BloqueFalso.Statements))
+                            yield return anidada;
+                }
+                else if (sentencia is WhileNode mientras)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(mientras.Cuerpo.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is DoWhileNode hacerMientras)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(hacerMientras.Cuerpo.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is ForNode para)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(para.Cuerpo.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is SwitchNode seleccion)
+                {
+                    foreach (SwitchCaseNode caso in seleccion.Casos)
+                        foreach (DeclarationNode anidada in EnumerarDeclaraciones(caso.Cuerpo.Statements))
+                            yield return anidada;
+                    if (seleccion.Predeterminado != null)
+                        foreach (DeclarationNode anidada in EnumerarDeclaraciones(seleccion.Predeterminado.Statements))
+                            yield return anidada;
                 }
             }
         }
