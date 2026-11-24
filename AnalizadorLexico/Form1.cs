@@ -8,13 +8,20 @@ namespace AnalizadorLexico
 {
     public partial class Form1 : Form
     {
-        private Recorrido r = new();
+        private AnalizadorLexico _analizadorLexico = new();
         private AnalizadorSintactico _sintactico = new();
         private AnalizadorSemantico _semantico = new();
+        private readonly DataGridView _dgvIROriginal = new();
+        private readonly DataGridView _dgvIROptimizado = new();
+        private readonly RichTextBox _rtxInformeOptimizacion = new();
+        private readonly Button _btnOptimizar = new();
+        private readonly Label _lblCostoEstimado = new();
+        private List<Cuadruplo> _codigoIntermedioOriginal = new();
 
         public Form1()
         {
             InitializeComponent();
+            CrearPestanaOptimizacion();
 
             // Eventos de los botones que se conservan.
             btnCargar.Click += btnCargar_Click;
@@ -48,6 +55,120 @@ namespace AnalizadorLexico
             LimpiarSalidasCodigoIntermedio();
         }
 
+        private void CrearPestanaOptimizacion()
+        {
+            tabPageResultadoOptimizacion.BackColor = SystemColors.GradientActiveCaption;
+            tabPageResultadoOptimizacion.Padding = new Padding(12);
+
+            TableLayoutPanel contenido = new()
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 4,
+                Padding = new Padding(8)
+            };
+            contenido.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            contenido.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
+            contenido.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
+            contenido.RowStyles.Add(new RowStyle(SizeType.Percent, 32));
+            tabPageResultadoOptimizacion.Controls.Add(contenido);
+
+            FlowLayoutPanel acciones = new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
+            _btnOptimizar.Text = "Optimizar código intermedio";
+            _btnOptimizar.AutoSize = true;
+            _btnOptimizar.Enabled = false;
+            _btnOptimizar.Click += btnOptimizar_Click;
+            _lblCostoEstimado.AutoSize = true;
+            _lblCostoEstimado.Text = "El costo mostrado es una cuenta de instrucciones IR, no una medición de ejecución.";
+            _lblCostoEstimado.Margin = new Padding(16, 10, 3, 3);
+            acciones.Controls.Add(_btnOptimizar);
+            acciones.Controls.Add(_lblCostoEstimado);
+            contenido.Controls.Add(acciones, 0, 0);
+
+            ConfigurarTablaIR(_dgvIROriginal);
+            ConfigurarTablaIR(_dgvIROptimizado);
+            contenido.Controls.Add(CrearGrupoIR("IR original", _dgvIROriginal), 0, 1);
+            contenido.Controls.Add(CrearGrupoIR("IR optimizado", _dgvIROptimizado), 0, 2);
+
+            _rtxInformeOptimizacion.Dock = DockStyle.Fill;
+            _rtxInformeOptimizacion.ReadOnly = true;
+            _rtxInformeOptimizacion.Font = new Font("Consolas", 9F);
+            contenido.Controls.Add(CrearGrupoIR("Reglas y análisis de flujo de datos", _rtxInformeOptimizacion), 0, 3);
+        }
+
+        private static GroupBox CrearGrupoIR(string titulo, Control contenido)
+        {
+            GroupBox grupo = new()
+            {
+                Text = titulo,
+                Dock = DockStyle.Fill,
+                BackColor = SystemColors.GradientInactiveCaption,
+                Padding = new Padding(8),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+            };
+            contenido.Dock = DockStyle.Fill;
+            grupo.Controls.Add(contenido);
+            return grupo;
+        }
+
+        private static void ConfigurarTablaIR(DataGridView tabla)
+        {
+            tabla.AllowUserToAddRows = false;
+            tabla.AllowUserToDeleteRows = false;
+            tabla.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            tabla.BackgroundColor = SystemColors.Window;
+            tabla.Dock = DockStyle.Fill;
+            tabla.ReadOnly = true;
+            tabla.RowHeadersVisible = false;
+            tabla.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            tabla.Columns.Add("Numero", "No.");
+            tabla.Columns.Add("Operador", "Operador");
+            tabla.Columns.Add("Argumento1", "Arg1");
+            tabla.Columns.Add("Argumento2", "Arg2");
+            tabla.Columns.Add("Resultado", "Resultado");
+        }
+
+        private void btnOptimizar_Click(object? sender, EventArgs e)
+        {
+            if (_codigoIntermedioOriginal.Count == 0)
+            {
+                MessageBox.Show("Primero genere el código intermedio del programa.", "Optimización", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                Optimizacion optimizador = new();
+                List<Cuadruplo> codigoOptimizado = optimizador.Optimizar(_codigoIntermedioOriginal);
+                CodigoIntermedio generadorOptimizado = new();
+                generadorOptimizado.GenerarDesdeCuadruplos(codigoOptimizado);
+
+                MostrarCuadruplos(_dgvIROriginal, _codigoIntermedioOriginal);
+                MostrarCuadruplos(_dgvIROptimizado, codigoOptimizado);
+                int diferencia = optimizador.InstruccionesAntesOptimizacion - optimizador.InstruccionesDespuesOptimizacion;
+                int diferenciaCosto = optimizador.CostoAntesOptimizacion - optimizador.CostoDespuesOptimizacion;
+                _lblCostoEstimado.Text = $"Instrucciones: {optimizador.InstruccionesAntesOptimizacion} → {optimizador.InstruccionesDespuesOptimizacion} (Δ {diferencia:+#;-#;0}); costo: {optimizador.CostoAntesOptimizacion} → {optimizador.CostoDespuesOptimizacion} (Δ {diferenciaCosto:+#;-#;0}); pila: {optimizador.PilaEstimadaAntesOptimizacion} → {optimizador.PilaEstimadaDespuesOptimizacion}; registros: {optimizador.RegistrosEstimadosAntesOptimizacion} → {optimizador.RegistrosEstimadosDespuesOptimizacion}; memoria: {optimizador.MemoriaEstimadaAntesOptimizacion} → {optimizador.MemoriaEstimadaDespuesOptimizacion} bytes";
+                _rtxInformeOptimizacion.Text = optimizador.InformeOptimizacion + Environment.NewLine + Environment.NewLine +
+                    "Flujo de datos del IR optimizado:" + Environment.NewLine +
+                    optimizador.AnalizarFlujoDeDatos(codigoOptimizado) + Environment.NewLine + Environment.NewLine +
+                    "Código de tres direcciones optimizado:" + Environment.NewLine +
+                    generadorOptimizado.CodigoTresDireccionesCuadruplos;
+                tabControl1.SelectedTab = tabPageOptimizacion;
+                tabControlOptimizacion.SelectedTab = tabPageResultadoOptimizacion;
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "No se pudo optimizar el IR", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static void MostrarCuadruplos(DataGridView tabla, IEnumerable<Cuadruplo> cuadruplos)
+        {
+            tabla.Rows.Clear();
+            foreach (Cuadruplo cuadruplo in cuadruplos)
+                tabla.Rows.Add(cuadruplo.Numero, cuadruplo.Operador, cuadruplo.Argumento1, cuadruplo.Argumento2, cuadruplo.Resultado);
+        }
+
         // ========================================================
         // GENERAR CODIGO INTERMEDIO
         // ========================================================
@@ -73,7 +194,7 @@ namespace AnalizadorLexico
             // ====================================================
 
             var (tokens, erroresLexicos, _) =
-                r.AnalizarPrograma(texto);
+                _analizadorLexico.AnalizarPrograma(texto);
 
             rtxTokens.Clear();
 
@@ -232,6 +353,15 @@ namespace AnalizadorLexico
 
             var cuadruplos =
                 generador.GenerarDesdeAst(_sintactico.AstRoot);
+            _codigoIntermedioOriginal = cuadruplos.Select(c => new Cuadruplo
+            {
+                Numero = c.Numero,
+                Operador = c.Operador,
+                Argumento1 = c.Argumento1,
+                Argumento2 = c.Argumento2,
+                Resultado = c.Resultado
+            }).ToList();
+            _btnOptimizar.Enabled = _codigoIntermedioOriginal.Count > 0;
 
             // ----------------------------------------------------
             // 4.1 CUADRUPLOS
@@ -300,7 +430,7 @@ namespace AnalizadorLexico
             if (cuadruplos.Count == 0)
             {
                 MessageBox.Show(
-                    "No se encontraron asignaciones aritméticas compatibles para generar las representaciones intermedias.",
+                    "El programa no generó instrucciones intermedias.",
                     "Código intermedio",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
@@ -327,6 +457,12 @@ namespace AnalizadorLexico
         {
             dgvCuadruplos.Rows.Clear();
             dgvTriplos.Rows.Clear();
+            _codigoIntermedioOriginal.Clear();
+            _dgvIROriginal.Rows.Clear();
+            _dgvIROptimizado.Rows.Clear();
+            _rtxInformeOptimizacion.Clear();
+            _lblCostoEstimado.Text = "El costo mostrado es una cuenta de instrucciones IR, no una medición de ejecución.";
+            _btnOptimizar.Enabled = false;
 
             richTextBox2.Clear();
             richTextBox6.Clear();
@@ -408,7 +544,7 @@ namespace AnalizadorLexico
                 }
 
                 var (tokens, errores, simbolos) =
-                    r.AnalizarPrograma(texto);
+                    _analizadorLexico.AnalizarPrograma(texto);
 
                 rtxTokens.Clear();
 
@@ -699,7 +835,7 @@ namespace AnalizadorLexico
                 return;
             }
 
-            var (tokens, _, _) = r.AnalizarPrograma(texto);
+            var (tokens, _, _) = _analizadorLexico.AnalizarPrograma(texto);
 
             bool valido = _sintactico.Analizar(tokens);
 
@@ -810,7 +946,7 @@ namespace AnalizadorLexico
             }
 
             // Obtener tokens.
-            var (tokens, _, _) = r.AnalizarPrograma(texto);
+            var (tokens, _, _) = _analizadorLexico.AnalizarPrograma(texto);
 
             // Generar el AST.
             _sintactico.Analizar(tokens);

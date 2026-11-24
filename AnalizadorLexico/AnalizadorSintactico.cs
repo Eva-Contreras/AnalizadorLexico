@@ -292,7 +292,7 @@
             _sentenciasActuales = cuerpo.Statements;
             ParseS();
             _sentenciasActuales = anterior;
-            Consumir("CD11", "Se esperaba 'terminar' al final de opcion");
+            Consumir("CD10", "Se esperaba 'terminar' al final de opcion");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
             seleccion.Casos.Add(new SwitchCaseNode { Valor = valor as ExpressionNode, Cuerpo = cuerpo });
             Pasos.Add("[PR7] opcion reconocida ✔");
@@ -308,7 +308,7 @@
             _sentenciasActuales = cuerpo.Statements;
             ParseS();
             _sentenciasActuales = anterior;
-            Consumir("CD11", "Se esperaba 'terminar' al final de predefinido");
+            Consumir("CD10", "Se esperaba 'terminar' al final de predefinido");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
             seleccion.Predeterminado = cuerpo;
             Pasos.Add("[PR8] predefinido reconocido ✔");
@@ -634,15 +634,21 @@
         private AstNode? ConstruirExpresion(int inicio, int fin)
         {
             if (inicio >= fin || inicio < 0 || fin > _tokens.Count)
+            {
+                Error($"Expresión vacía o inválida en línea {_ultimaLineaConsumida}");
                 return null;
+            }
 
-            var tokens = _tokens.Skip(inicio).Take(fin - inicio).ToList();
+            List<(int linea, string valor, string token)> tokens = _tokens.Skip(inicio).Take(fin - inicio).ToList();
             int indice = 0;
             ExpressionNode? expresion = ParseExpresionSuma(tokens, ref indice);
-            return indice == tokens.Count && expresion != null ? expresion : new RawExpressionNode
+            if (expresion == null || indice != tokens.Count)
             {
-                Texto = string.Join(" ", tokens.Select(t => t.valor))
-            };
+                Error($"No se pudo construir la expresión del AST en línea {tokens[0].linea}");
+                return null;
+            }
+
+            return expresion;
         }
 
         private ExpressionNode? ParseExpresionSuma(
@@ -650,18 +656,12 @@
             ref int indice)
         {
             ExpressionNode? izquierda = ParseExpresionProducto(tokens, ref indice);
-            while (izquierda != null && indice < tokens.Count &&
-                   (tokens[indice].valor == "+" || tokens[indice].valor == "-"))
+            while (izquierda != null && indice < tokens.Count && EsOperadorAditivo(tokens[indice]))
             {
                 string operador = tokens[indice++].valor;
                 ExpressionNode? derecha = ParseExpresionProducto(tokens, ref indice);
-                if (derecha == null) return izquierda;
-                izquierda = new BinaryExpressionNode
-                {
-                    Operador = operador,
-                    Izquierda = izquierda,
-                    Derecha = derecha
-                };
+                if (derecha == null) return null;
+                izquierda = CrearOperacion(operador, izquierda, derecha);
             }
             return izquierda;
         }
@@ -670,19 +670,42 @@
             List<(int linea, string valor, string token)> tokens,
             ref int indice)
         {
-            ExpressionNode? izquierda = ParseFactor(tokens, ref indice);
-            while (izquierda != null && indice < tokens.Count &&
-                   (tokens[indice].valor == "*" || tokens[indice].valor == "/"))
+            ExpressionNode? izquierda = ParseExpresionUnaria(tokens, ref indice);
+            while (izquierda != null && indice < tokens.Count && EsOperadorMultiplicativo(tokens[indice]))
             {
                 string operador = tokens[indice++].valor;
-                ExpressionNode? derecha = ParseFactor(tokens, ref indice);
-                if (derecha == null) return izquierda;
-                izquierda = new BinaryExpressionNode
-                {
-                    Operador = operador,
-                    Izquierda = izquierda,
-                    Derecha = derecha
-                };
+                ExpressionNode? derecha = ParseExpresionUnaria(tokens, ref indice);
+                if (derecha == null) return null;
+                izquierda = CrearOperacion(operador, izquierda, derecha);
+            }
+            return izquierda;
+        }
+
+        private ExpressionNode? ParseExpresionUnaria(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            if (indice < tokens.Count && (tokens[indice].valor == "+" || tokens[indice].valor == "-"))
+            {
+                string operador = tokens[indice++].valor;
+                ExpressionNode? operando = ParseExpresionUnaria(tokens, ref indice);
+                return operando == null ? null : new UnaryExpressionNode { Operador = operador, Operando = operando };
+            }
+
+            return ParsePotencia(tokens, ref indice);
+        }
+
+        private ExpressionNode? ParsePotencia(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            ExpressionNode? izquierda = ParseFactor(tokens, ref indice);
+            if (izquierda != null && indice < tokens.Count && tokens[indice].valor == "^")
+            {
+                indice++;
+                ExpressionNode? derecha = ParseExpresionUnaria(tokens, ref indice);
+                if (derecha == null) return null;
+                izquierda = CrearOperacion("^", izquierda, derecha);
             }
             return izquierda;
         }
@@ -692,31 +715,39 @@
             ref int indice)
         {
             if (indice >= tokens.Count) return null;
+
             string valor = tokens[indice].valor;
             string token = tokens[indice].token;
-            if (valor == "+" || valor == "-")
-            {
-                indice++;
-                ExpressionNode? operando = ParseFactor(tokens, ref indice);
-                return operando == null ? null : new UnaryExpressionNode
-                {
-                    Operador = valor,
-                    Operando = operando
-                };
-            }
             if (token == "CD3")
             {
                 indice++;
                 ExpressionNode? agrupada = ParseExpresionSuma(tokens, ref indice);
-                if (indice < tokens.Count && tokens[indice].token == "CD4") indice++;
+                if (agrupada == null || indice >= tokens.Count || tokens[indice].token != "CD4") return null;
+                indice++;
                 return agrupada;
             }
-            indice++;
+
             if (token.StartsWith("IDV", StringComparison.Ordinal))
+            {
+                indice++;
                 return new IdentifierNode { Nombre = valor };
+            }
             if (token == "CAD" || token == "CNU" || token == "CNR")
+            {
+                indice++;
                 return new LiteralNode { TipoLiteral = token, Valor = valor };
+            }
             return null;
+        }
+
+        private static bool EsOperadorAditivo((int linea, string valor, string token) token)
+        {
+            return token.valor == "+" || token.valor == "-";
+        }
+
+        private static bool EsOperadorMultiplicativo((int linea, string valor, string token) token)
+        {
+            return token.valor == "*" || token.valor == "/" || token.valor == "%";
         }
 
         private ExpressionNode? ConstruirCondicion(int inicio, int fin)
@@ -724,133 +755,97 @@
             if (inicio >= fin || inicio < 0 || fin > _tokens.Count) return null;
 
             List<(int linea, string valor, string token)> tokens = _tokens.Skip(inicio).Take(fin - inicio).ToList();
-            int indice = 0;
-            ExpressionNode? condicion = ParseCondicionOr(tokens, ref indice);
-            return indice == tokens.Count ? condicion : null;
+            ExpressionNode? condicion = ParseCondicion(tokens);
+            if (condicion == null)
+                Error($"No se pudo construir la condición del AST en línea {tokens[0].linea}");
+            return condicion;
         }
 
-        private ExpressionNode? ParseCondicionOr(
-            List<(int linea, string valor, string token)> tokens,
-            ref int indice)
+        private ExpressionNode? ParseCondicion(List<(int linea, string valor, string token)> tokens)
         {
-            ExpressionNode? izquierda = ParseCondicionAnd(tokens, ref indice);
-            while (izquierda != null && indice < tokens.Count && tokens[indice].token == "OL3")
+            if (tokens.Count == 0) return null;
+
+            if (EstaEnmarcadaPorParentesis(tokens))
+                return ParseCondicion(tokens.Skip(1).Take(tokens.Count - 2).ToList());
+
+            int operador = BuscarOperadorLogico(tokens, "OL3");
+            if (operador >= 0)
             {
-                indice++;
-                ExpressionNode? derecha = ParseCondicionAnd(tokens, ref indice);
-                if (derecha == null) return izquierda;
-                izquierda = CrearOperacion("O", izquierda, derecha);
+                ExpressionNode? izquierda = ParseCondicion(tokens.Take(operador).ToList());
+                ExpressionNode? derecha = ParseCondicion(tokens.Skip(operador + 1).ToList());
+                return izquierda == null || derecha == null ? null : CrearOperacion("O", izquierda, derecha);
             }
-            return izquierda;
-        }
 
-        private ExpressionNode? ParseCondicionAnd(
-            List<(int linea, string valor, string token)> tokens,
-            ref int indice)
-        {
-            ExpressionNode? izquierda = ParseCondicionNot(tokens, ref indice);
-            while (izquierda != null && indice < tokens.Count && tokens[indice].token == "OL1")
+            operador = BuscarOperadorLogico(tokens, "OL1");
+            if (operador >= 0)
             {
-                indice++;
-                ExpressionNode? derecha = ParseCondicionNot(tokens, ref indice);
-                if (derecha == null) return izquierda;
-                izquierda = CrearOperacion("Y", izquierda, derecha);
+                ExpressionNode? izquierda = ParseCondicion(tokens.Take(operador).ToList());
+                ExpressionNode? derecha = ParseCondicion(tokens.Skip(operador + 1).ToList());
+                return izquierda == null || derecha == null ? null : CrearOperacion("Y", izquierda, derecha);
             }
-            return izquierda;
-        }
 
-        private ExpressionNode? ParseCondicionNot(
-            List<(int linea, string valor, string token)> tokens,
-            ref int indice)
-        {
-            if (indice < tokens.Count && tokens[indice].token == "OL2")
+            if (tokens[0].token == "OL2")
             {
-                indice++;
-                ExpressionNode? operando = ParseCondicionNot(tokens, ref indice);
+                ExpressionNode? operando = ParseCondicion(tokens.Skip(1).ToList());
                 return operando == null ? null : new UnaryExpressionNode { Operador = "NO", Operando = operando };
             }
 
-            int inicio = indice;
-            int profundidad = 0;
-            int cierreGrupo = -1;
-            if (indice < tokens.Count && tokens[indice].token == "CD3")
+            operador = BuscarOperadorRelacional(tokens);
+            if (operador >= 0)
             {
-                for (int i = indice; i < tokens.Count; i++)
-                {
-                    if (tokens[i].token == "CD3") profundidad++;
-                    else if (tokens[i].token == "CD4" && --profundidad == 0)
-                    {
-                        cierreGrupo = i;
-                        break;
-                    }
-                }
+                ExpressionNode? izquierda = ParseExpresionCompleta(tokens.Take(operador).ToList());
+                ExpressionNode? derecha = ParseExpresionCompleta(tokens.Skip(operador + 1).ToList());
+                return izquierda == null || derecha == null
+                    ? null
+                    : CrearOperacion(tokens[operador].valor, izquierda, derecha);
             }
 
-            if (cierreGrupo > indice && tokens.Skip(indice + 1).Take(cierreGrupo - indice - 1)
-                    .Any(t => t.token.StartsWith("OR", StringComparison.Ordinal) ||
-                              t.token == "OL1" || t.token == "OL2" || t.token == "OL3"))
-            {
-                indice++;
-                ExpressionNode? agrupada = ParseCondicionOr(tokens, ref indice);
-                if (indice < tokens.Count && tokens[indice].token == "CD4") indice++;
-                return agrupada;
-            }
+            return ParseExpresionCompleta(tokens);
+        }
 
+        private ExpressionNode? ParseExpresionCompleta(List<(int linea, string valor, string token)> tokens)
+        {
+            int indice = 0;
+            ExpressionNode? expresion = ParseExpresionSuma(tokens, ref indice);
+            return expresion != null && indice == tokens.Count ? expresion : null;
+        }
+
+        private static bool EstaEnmarcadaPorParentesis(List<(int linea, string valor, string token)> tokens)
+        {
+            if (tokens.Count < 2 || tokens[0].token != "CD3" || tokens[^1].token != "CD4") return false;
             int nivel = 0;
-            int operadorRelacional = -1;
-            for (int i = indice; i < tokens.Count; i++)
+            for (int i = 0; i < tokens.Count; i++)
             {
                 if (tokens[i].token == "CD3") nivel++;
-                else if (tokens[i].token == "CD4")
-                {
-                    if (nivel == 0) break;
-                    nivel--;
-                }
-                else if (nivel == 0 && tokens[i].token.StartsWith("OR", StringComparison.Ordinal))
-                {
-                    operadorRelacional = i;
-                    break;
-                }
-                else if (nivel == 0 && (tokens[i].token == "OL1" || tokens[i].token == "OL3"))
-                {
-                    break;
-                }
+                else if (tokens[i].token == "CD4" && --nivel == 0) return i == tokens.Count - 1;
             }
+            return false;
+        }
 
-            if (operadorRelacional < 0)
+        private static int BuscarOperadorLogico(
+            List<(int linea, string valor, string token)> tokens,
+            string operador)
+        {
+            int nivel = 0;
+            for (int i = 0; i < tokens.Count; i++)
             {
-                int fin = indice;
-                while (fin < tokens.Count && tokens[fin].token != "CD4" &&
-                       tokens[fin].token != "OL1" && tokens[fin].token != "OL3") fin++;
-                List<(int linea, string valor, string token)> operandoTokens = tokens.Skip(indice).Take(fin - indice).ToList();
-                indice = fin;
-                int indiceExpresion = 0;
-                return ParseExpresionSuma(operandoTokens, ref indiceExpresion);
+                if (tokens[i].token == "CD3") nivel++;
+                else if (tokens[i].token == "CD4") nivel--;
+                else if (nivel == 0 && tokens[i].token == operador) return i;
             }
+            return -1;
+        }
 
-            List<(int linea, string valor, string token)> izquierdaTokens = tokens.Skip(indice).Take(operadorRelacional - indice).ToList();
-            int siguienteOperando = operadorRelacional + 1;
-            nivel = 0;
-            while (siguienteOperando < tokens.Count)
+        private int BuscarOperadorRelacional(List<(int linea, string valor, string token)> tokens)
+        {
+            int nivel = 0;
+            for (int i = 0; i < tokens.Count; i++)
             {
-                if (tokens[siguienteOperando].token == "CD3") nivel++;
-                else if (tokens[siguienteOperando].token == "CD4")
-                {
-                    if (nivel == 0) break;
-                    nivel--;
-                }
-                else if (nivel == 0 && (tokens[siguienteOperando].token == "OL1" || tokens[siguienteOperando].token == "OL3")) break;
-                siguienteOperando++;
+                if (tokens[i].token == "CD3") nivel++;
+                else if (tokens[i].token == "CD4") nivel--;
+                else if (nivel == 0 && EsOR(tokens[i].token)) return i;
             }
-
-            List<(int linea, string valor, string token)> derechaTokens = tokens.Skip(operadorRelacional + 1).Take(siguienteOperando - operadorRelacional - 1).ToList();
-            int indiceIzquierda = 0;
-            int indiceDerecha = 0;
-            ExpressionNode? izquierdaRelacional = ParseExpresionSuma(izquierdaTokens, ref indiceIzquierda);
-            ExpressionNode? derechaRelacional = ParseExpresionSuma(derechaTokens, ref indiceDerecha);
-            indice = siguienteOperando;
-            return izquierdaRelacional == null || derechaRelacional == null ? null :
-                CrearOperacion(tokens[operadorRelacional].valor, izquierdaRelacional, derechaRelacional);
+            return -1;
         }
 
         private static BinaryExpressionNode CrearOperacion(

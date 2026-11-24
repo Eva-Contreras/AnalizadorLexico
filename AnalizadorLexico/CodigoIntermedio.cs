@@ -36,12 +36,10 @@ namespace AnalizadorLexico
 
         private readonly List<string> _codigoTresDireccionesCuadruplos = new();
         private readonly List<string> _codigoTresDireccionesTriplos = new();
-        private readonly List<string> _resultadosCalculados = new();
-
-        private readonly Dictionary<string, double> _valoresVariables = new();
 
         private int _contadorTemporales;
         private int _contadorEtiquetas;
+
 
         public List<Cuadruplo> Cuadruplos =>
             new List<Cuadruplo>(_cuadruplos);
@@ -64,29 +62,16 @@ namespace AnalizadorLexico
         public string CodigoTresDireccionesTriplos =>
             string.Join(Environment.NewLine, _codigoTresDireccionesTriplos);
 
-        public string ResultadosCalculados =>
-            string.Join(Environment.NewLine, _resultadosCalculados);
-
-        // =====================================================
-        // NODO DEL ARBOL DE EXPRESIONES
-        // =====================================================
-        private class NodoExpresion
-        {
-            public string Valor { get; set; } = string.Empty;
-            public string Operador { get; set; } = string.Empty;
-            public NodoExpresion? Izquierda { get; set; }
-            public NodoExpresion? Derecha { get; set; }
-            public bool EsOperando { get; set; }
-            public bool EsUnario { get; set; }
-        }
-
         // =====================================================
         // GENERAR REPRESENTACIONES
         // =====================================================
         public List<Cuadruplo> GenerarDesdeAst(ProgramNode programa)
         {
+            ArgumentNullException.ThrowIfNull(programa);
             LimpiarResultados();
             EmitirSentencias(programa.Statements);
+            ValidarOperadores(_cuadruplos);
+            ValidarEtiquetas(_cuadruplos);
             GenerarTriplos();
             GenerarCodigoTresDireccionesCuadruplos();
             GenerarCodigoTresDireccionesTriplos();
@@ -95,56 +80,36 @@ namespace AnalizadorLexico
             return Cuadruplos;
         }
 
-        public List<Cuadruplo> GenerarDesdeTexto(string codigoFuente)
+        public List<Cuadruplo> GenerarDesdeCuadruplos(IEnumerable<Cuadruplo> codigo)
         {
+            ArgumentNullException.ThrowIfNull(codigo);
             LimpiarResultados();
-
-            if (string.IsNullOrWhiteSpace(codigoFuente))
-                return Cuadruplos;
-
-            string[] lineas = codigoFuente.Split(
-                new[] { "\r\n", "\n" },
-                StringSplitOptions.None
-            );
-
-            foreach (string linea in lineas)
-            {
-                string texto = linea.Trim();
-
-                if (string.IsNullOrWhiteSpace(texto))
-                    continue;
-
-                if (texto.StartsWith("//") || texto.StartsWith("#"))
-                    continue;
-
-                int comentario = texto.IndexOf("//");
-
-                if (comentario >= 0)
-                    texto = texto.Substring(0, comentario).Trim();
-
-                if (string.IsNullOrWhiteSpace(texto))
-                    continue;
-
-                
-                if (texto == "{" || texto == "}" ||
-                    Regex.IsMatch(
-                        texto,
-                        @"^(PARA|LEER|IMPRIMIR|MIENTRAS|HACER|SI|SINO)\b",
-                        RegexOptions.IgnoreCase))
-                {
-                    continue;
-                }
-
-                ProcesarAsignacion(texto);
-            }
-
+            _cuadruplos.AddRange(codigo.Select(ClonarCuadruplo));
+            RenumerarCuadruplos(_cuadruplos);
+            ValidarOperadores(_cuadruplos);
+            ValidarEtiquetas(_cuadruplos);
             GenerarTriplos();
             GenerarCodigoTresDireccionesCuadruplos();
             GenerarCodigoTresDireccionesTriplos();
-
+            GenerarCodigoPDesdeCuadruplos();
+            GenerarNotacionesDesdeCuadruplos();
             return Cuadruplos;
         }
 
+        private static Cuadruplo ClonarCuadruplo(Cuadruplo instruccion) => new()
+        {
+            Numero = instruccion.Numero,
+            Operador = instruccion.Operador,
+            Argumento1 = instruccion.Argumento1,
+            Argumento2 = instruccion.Argumento2,
+            Resultado = instruccion.Resultado
+        };
+
+        private static void RenumerarCuadruplos(List<Cuadruplo> instrucciones)
+        {
+            for (int i = 0; i < instrucciones.Count; i++)
+                instrucciones[i].Numero = i + 1;
+        }
         private void EmitirSentencias(IEnumerable<AstNode> sentencias)
         {
             foreach (AstNode sentencia in sentencias)
@@ -187,6 +152,8 @@ namespace AnalizadorLexico
                     case SwitchNode seleccion:
                         EmitirSwitch(seleccion);
                         break;
+                    default:
+                        throw new InvalidOperationException($"No se puede generar IR para el nodo {sentencia.GetType().Name}.");
                 }
             }
         }
@@ -197,125 +164,6 @@ namespace AnalizadorLexico
             AgregarCuadruplo("=", operando, string.Empty, destino);
         }
 
-        private void AgregarRepresentacionesDeExpresion(string destino, AstNode? expresion)
-        {
-            List<string> postfija = new() { destino };
-            GenerarPostfijaAst(expresion, postfija);
-            postfija.Add("=");
-            _notacionPostfija.Add(string.Join(" ", postfija));
-
-            List<string> prefija = new() { "=", destino };
-            GenerarPrefijaAst(expresion, prefija);
-            _notacionPrefija.Add(string.Join(" ", prefija));
-
-            GenerarCodigoPAst(expresion);
-            _codigoP.Add($"sto {destino}");
-        }
-
-        private void GenerarPostfijaAst(AstNode? expresion, List<string> salida)
-        {
-            if (expresion is BinaryExpressionNode binaria)
-            {
-                GenerarPostfijaAst(binaria.Izquierda, salida);
-                GenerarPostfijaAst(binaria.Derecha, salida);
-                salida.Add(binaria.Operador);
-            }
-            else if (expresion is UnaryExpressionNode unaria)
-            {
-                GenerarPostfijaAst(unaria.Operando, salida);
-                salida.Add(unaria.Operador == "-" ? "NEG" : "POS");
-            }
-            else
-            {
-                salida.Add(EmitirExpresionLiteral(expresion));
-            }
-        }
-
-        private void GenerarPrefijaAst(AstNode? expresion, List<string> salida)
-        {
-            if (expresion is BinaryExpressionNode binaria)
-            {
-                salida.Add(binaria.Operador);
-                GenerarPrefijaAst(binaria.Izquierda, salida);
-                GenerarPrefijaAst(binaria.Derecha, salida);
-            }
-            else if (expresion is UnaryExpressionNode unaria)
-            {
-                salida.Add(unaria.Operador == "-" ? "NEG" : "POS");
-                GenerarPrefijaAst(unaria.Operando, salida);
-            }
-            else
-            {
-                salida.Add(EmitirExpresionLiteral(expresion));
-            }
-        }
-
-        private void GenerarCodigoPAst(AstNode? expresion)
-        {
-            if (expresion is BinaryExpressionNode binaria)
-            {
-                GenerarCodigoPAst(binaria.Izquierda);
-                GenerarCodigoPAst(binaria.Derecha);
-                string? operacion = binaria.Operador switch
-                {
-                    "+" => "adi",
-                    "-" => "sbi",
-                    "*" => "mli",
-                    "/" => "dvi",
-                    _ => null
-                };
-                if (operacion != null) _codigoP.Add(operacion);
-            }
-            else if (expresion is UnaryExpressionNode unaria)
-            {
-                GenerarCodigoPAst(unaria.Operando);
-                if (unaria.Operador == "-") _codigoP.Add("ngi");
-            }
-            else
-            {
-                string operando = EmitirExpresionLiteral(expresion);
-                _codigoP.Add(EsNumero(operando) || EsCadena(operando) ? $"ldc {operando}" : $"lod {operando}");
-            }
-        }
-
-        private string EmitirExpresionLiteral(AstNode? expresion)
-        {
-            return expresion switch
-            {
-                IdentifierNode identificador => identificador.Nombre,
-                LiteralNode literal => literal.Valor,
-                RawExpressionNode raw => raw.Texto,
-                _ => string.Empty
-            };
-        }
-
-        private string EmitirCondicion(AstNode? condicion)
-        {
-            if (condicion == null)
-                throw new InvalidOperationException("No se pudo construir una expresión booleana válida desde el AST.");
-
-            if (condicion is UnaryExpressionNode unaria && unaria.Operador == "NO")
-            {
-                string operandoNegado = EmitirCondicion(unaria.Operando);
-                string resultadoNegacion = NuevaTemporal();
-                AgregarCuadruplo("NOT", operandoNegado, string.Empty, resultadoNegacion);
-                return resultadoNegacion;
-            }
-
-            if (condicion is BinaryExpressionNode binaria &&
-                (binaria.Operador == "Y" || binaria.Operador == "O"))
-            {
-                string izquierdaLogica = EmitirCondicion(binaria.Izquierda);
-                string derechaLogica = EmitirCondicion(binaria.Derecha);
-                string resultadoLogico = NuevaTemporal();
-                AgregarCuadruplo(binaria.Operador == "Y" ? "AND" : "OR",
-                    izquierdaLogica, derechaLogica, resultadoLogico);
-                return resultadoLogico;
-            }
-
-            return EmitirExpresion(condicion);
-        }
-
         private string EmitirExpresion(AstNode? expresion)
         {
             switch (expresion)
@@ -324,13 +172,12 @@ namespace AnalizadorLexico
                     return identificador.Nombre;
                 case LiteralNode literal:
                     return literal.Valor;
-                case RawExpressionNode raw:
-                    return raw.Texto;
-                case UnaryExpressionNode unaria:
+                case UnaryExpressionNode unaria when unaria.Operador == "+":
+                    return EmitirExpresion(unaria.Operando);
+                case UnaryExpressionNode unaria when unaria.Operador == "-":
                     string operando = EmitirExpresion(unaria.Operando);
                     string temporalUnario = NuevaTemporal();
-                    AgregarCuadruplo(unaria.Operador == "-" ? "NEG" : "POS",
-                        operando, string.Empty, temporalUnario);
+                    AgregarCuadruplo("NEG", operando, string.Empty, temporalUnario);
                     return temporalUnario;
                 case BinaryExpressionNode binaria:
                     string izquierda = EmitirExpresion(binaria.Izquierda);
@@ -339,7 +186,7 @@ namespace AnalizadorLexico
                     AgregarCuadruplo(binaria.Operador, izquierda, derecha, temporal);
                     return temporal;
                 default:
-                    return string.Empty;
+                    throw new InvalidOperationException($"No se puede generar IR para la expresión {expresion?.GetType().Name ?? "nula"}.");
             }
         }
 
@@ -361,14 +208,14 @@ namespace AnalizadorLexico
                         _codigoP.Add(instruccion.Operador switch { "NEG" => "ngi", "NOT" => "not", _ => "nop" });
                         _codigoP.Add($"sto {instruccion.Resultado}");
                         break;
-                    case "+": case "-": case "*": case "/":
+                    case "+": case "-": case "*": case "/": case "%": case "^":
                     case ">": case "<": case ">=": case "<=": case "==": case "!=":
                     case "AND": case "OR":
                         CargarOperando(instruccion.Argumento1);
                         CargarOperando(instruccion.Argumento2);
                         _codigoP.Add(instruccion.Operador switch
                         {
-                            "+" => "adi", "-" => "sbi", "*" => "mli", "/" => "dvi",
+                            "+" => "adi", "-" => "sbi", "*" => "mli", "/" => "dvi", "%" => "mod", "^" => "pow",
                             ">" => "grt", "<" => "les", ">=" => "geq", "<=" => "leq",
                             "==" => "equ", "!=" => "neq", "AND" => "and", _ => "or"
                         });
@@ -401,6 +248,8 @@ namespace AnalizadorLexico
                     case "LOCATE":
                         _codigoP.Add($"loc {instruccion.Argumento1}");
                         break;
+                    default:
+                        throw new InvalidOperationException($"No se puede generar Código P para la instrucción '{instruccion.Operador}'.");
                 }
             }
         }
@@ -416,7 +265,7 @@ namespace AnalizadorLexico
             _notacionPostfija.Clear();
             foreach (Cuadruplo instruccion in _cuadruplos)
             {
-                bool binaria = instruccion.Operador is "+" or "-" or "*" or "/" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR";
+                bool binaria = instruccion.Operador is "+" or "-" or "*" or "/" or "%" or "^" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR";
                 if (instruccion.Operador == "=")
                 {
                     _notacionPrefija.Add($"= {instruccion.Resultado} {instruccion.Argumento1}");
@@ -457,29 +306,30 @@ namespace AnalizadorLexico
 
         private void EmitirIf(IfNode nodo)
         {
+            string etiquetaVerdadera = NuevaEtiqueta();
             string etiquetaFalsa = NuevaEtiqueta();
             string etiquetaFin = NuevaEtiqueta();
-            AgregarCuadruplo("IF_FALSE", EmitirCondicion(nodo.Condicion), string.Empty, etiquetaFalsa);
+            EmitirSaltoCondicional(nodo.Condicion, etiquetaVerdadera, etiquetaFalsa);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaVerdadera);
             EmitirSentencias(nodo.BloqueVerdadero.Statements);
             if (nodo.BloqueFalso != null)
-            {
                 AgregarCuadruplo("GOTO", string.Empty, string.Empty, etiquetaFin);
-                AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFalsa);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFalsa);
+            if (nodo.BloqueFalso != null)
+            {
                 EmitirSentencias(nodo.BloqueFalso.Statements);
                 AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFin);
-            }
-            else
-            {
-                AgregarCuadruplo("LABEL", string.Empty, string.Empty, etiquetaFalsa);
             }
         }
 
         private void EmitirWhile(WhileNode nodo)
         {
             string inicio = NuevaEtiqueta();
+            string cuerpo = NuevaEtiqueta();
             string fin = NuevaEtiqueta();
             AgregarCuadruplo("LABEL", string.Empty, string.Empty, inicio);
-            AgregarCuadruplo("IF_FALSE", EmitirCondicion(nodo.Condicion), string.Empty, fin);
+            EmitirSaltoCondicional(nodo.Condicion, cuerpo, fin);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, cuerpo);
             EmitirSentencias(nodo.Cuerpo.Statements);
             AgregarCuadruplo("GOTO", string.Empty, string.Empty, inicio);
             AgregarCuadruplo("LABEL", string.Empty, string.Empty, fin);
@@ -488,9 +338,11 @@ namespace AnalizadorLexico
         private void EmitirDoWhile(DoWhileNode nodo)
         {
             string inicio = NuevaEtiqueta();
+            string fin = NuevaEtiqueta();
             AgregarCuadruplo("LABEL", string.Empty, string.Empty, inicio);
             EmitirSentencias(nodo.Cuerpo.Statements);
-            AgregarCuadruplo("IF_TRUE", EmitirCondicion(nodo.Condicion), string.Empty, inicio);
+            EmitirSaltoCondicional(nodo.Condicion, inicio, fin);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, fin);
         }
 
         private void EmitirFor(ForNode nodo)
@@ -498,14 +350,50 @@ namespace AnalizadorLexico
             if (nodo.Inicializacion != null)
                 EmitirAsignacion(nodo.Inicializacion.Identificador, nodo.Inicializacion.Valor);
             string inicio = NuevaEtiqueta();
+            string cuerpo = NuevaEtiqueta();
             string fin = NuevaEtiqueta();
             AgregarCuadruplo("LABEL", string.Empty, string.Empty, inicio);
-            AgregarCuadruplo("IF_FALSE", EmitirCondicion(nodo.Condicion), string.Empty, fin);
+            EmitirSaltoCondicional(nodo.Condicion, cuerpo, fin);
+            AgregarCuadruplo("LABEL", string.Empty, string.Empty, cuerpo);
             EmitirSentencias(nodo.Cuerpo.Statements);
             if (nodo.Incremento != null)
                 EmitirAsignacion(nodo.Incremento.Identificador, nodo.Incremento.Valor);
             AgregarCuadruplo("GOTO", string.Empty, string.Empty, inicio);
             AgregarCuadruplo("LABEL", string.Empty, string.Empty, fin);
+        }
+
+        private void EmitirSaltoCondicional(AstNode? condicion, string destinoVerdadero, string destinoFalso)
+        {
+            if (condicion == null)
+                throw new InvalidOperationException("No se puede generar IR: falta una condición en el AST.");
+
+            if (condicion is UnaryExpressionNode negacion && negacion.Operador == "NO")
+            {
+                EmitirSaltoCondicional(negacion.Operando, destinoFalso, destinoVerdadero);
+                return;
+            }
+
+            if (condicion is BinaryExpressionNode logica && logica.Operador == "Y")
+            {
+                string siguiente = NuevaEtiqueta();
+                EmitirSaltoCondicional(logica.Izquierda, siguiente, destinoFalso);
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, siguiente);
+                EmitirSaltoCondicional(logica.Derecha, destinoVerdadero, destinoFalso);
+                return;
+            }
+
+            if (condicion is BinaryExpressionNode logicaO && logicaO.Operador == "O")
+            {
+                string siguiente = NuevaEtiqueta();
+                EmitirSaltoCondicional(logicaO.Izquierda, destinoVerdadero, siguiente);
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, siguiente);
+                EmitirSaltoCondicional(logicaO.Derecha, destinoVerdadero, destinoFalso);
+                return;
+            }
+
+            string resultado = EmitirExpresion(condicion);
+            AgregarCuadruplo("IF_TRUE", resultado, string.Empty, destinoVerdadero);
+            AgregarCuadruplo("GOTO", string.Empty, string.Empty, destinoFalso);
         }
 
         private void EmitirSwitch(SwitchNode nodo)
@@ -540,414 +428,9 @@ namespace AnalizadorLexico
 
             _codigoTresDireccionesCuadruplos.Clear();
             _codigoTresDireccionesTriplos.Clear();
-            _resultadosCalculados.Clear();
-
-            _valoresVariables.Clear();
 
             _contadorTemporales = 0;
             _contadorEtiquetas = 0;
-        }
-
-        // =====================================================
-        // PROCESAR ASIGNACION
-        // =====================================================
-        private void ProcesarAsignacion(string texto)
-        {
-            Match match = Regex.Match(
-                texto,
-                @"^(?:(?:ENT|DEC|CAD)\s+)?(?<dest>[A-Za-z_][A-Za-z0-9_]*)\s*=\s*(?<expr>.+?)\s*;?$",
-                RegexOptions.IgnoreCase
-            );
-
-            if (!match.Success)
-                return;
-
-            string destino = match.Groups["dest"].Value;
-            string expresion = match.Groups["expr"].Value.Trim();
-
-            if (string.IsNullOrWhiteSpace(expresion))
-                return;
-
-            NodoExpresion? arbol = AnalizarExpresion(expresion);
-
-            if (arbol == null)
-                return;
-
-            double? valorCalculado = EvaluarExpresion(arbol);
-
-            string resultado = GenerarCuadruplos(arbol);
-
-            if (string.IsNullOrWhiteSpace(resultado))
-                return;
-
-            AgregarCuadruplo(
-                "=",
-                resultado,
-                string.Empty,
-                destino
-            );
-
-            // Guardar el valor si puede calcularse.
-            if (valorCalculado.HasValue)
-            {
-                _valoresVariables[destino] = valorCalculado.Value;
-
-                _resultadosCalculados.Add(
-                    $"{destino} = {FormatoNumero(valorCalculado.Value)}"
-                );
-            }
-            else
-            {
-                _valoresVariables.Remove(destino);
-
-                _resultadosCalculados.Add(
-                    $"{destino} = valor no calculable"
-                );
-            }
-
-            // Notacion postfija.
-            List<string> postfija = new()
-            {
-                destino
-            };
-            GenerarPostfija(arbol, postfija);
-            postfija.Add("=");
-
-            _notacionPostfija.Add(string.Join(" ", postfija));
-
-            // Notacion prefija.
-            List<string> prefija = new()
-            {
-                "=",
-                destino
-            };
-
-            GenerarPrefija(arbol, prefija);
-
-            _notacionPrefija.Add(string.Join(" ", prefija));
-
-            
-
-            GenerarCodigoP(arbol);
-
-            _codigoP.Add($"sto {destino}");
-        }
-
-        // =====================================================
-        // ANALIZAR EXPRESION
-        // =====================================================
-        private NodoExpresion? AnalizarExpresion(string expresion)
-        {
-            List<string> tokens = TokenizarExpresion(expresion);
-
-            if (tokens.Count == 0)
-                return null;
-
-            int indice = 0;
-
-            NodoExpresion? arbol = ParseSumaResta(tokens, ref indice);
-
-            if (arbol == null || indice != tokens.Count)
-                return null;
-
-            return arbol;
-        }
-
-        // =====================================================
-        // TOKENIZAR EXPRESION
-        // =====================================================
-        private List<string> TokenizarExpresion(string expresion)
-        {
-            List<string> tokens = new();
-            int indice = 0;
-
-            while (indice < expresion.Length)
-            {
-                char caracter = expresion[indice];
-
-                if (char.IsWhiteSpace(caracter))
-                {
-                    indice++;
-                    continue;
-                }
-
-                // Cadenas entre comillas.
-                if (caracter == '"')
-                {
-                    int inicio = indice;
-                    indice++;
-
-                    while (indice < expresion.Length &&
-                           expresion[indice] != '"')
-                    {
-                        if (expresion[indice] == '\\' &&
-                            indice + 1 < expresion.Length)
-                        {
-                            indice += 2;
-                        }
-                        else
-                        {
-                            indice++;
-                        }
-                    }
-
-                    if (indice >= expresion.Length)
-                        return new List<string>();
-
-                    indice++;
-
-                    tokens.Add(
-                        expresion.Substring(inicio, indice - inicio)
-                    );
-
-                    continue;
-                }
-
-                // Numeros enteros y decimales.
-                if (char.IsDigit(caracter) ||
-                    (caracter == '.' &&
-                     indice + 1 < expresion.Length &&
-                     char.IsDigit(expresion[indice + 1])))
-                {
-                    int inicio = indice;
-                    bool tienePunto = false;
-
-                    while (indice < expresion.Length)
-                    {
-                        char actual = expresion[indice];
-
-                        if (char.IsDigit(actual))
-                        {
-                            indice++;
-                        }
-                        else if (actual == '.' && !tienePunto)
-                        {
-                            tienePunto = true;
-                            indice++;
-                        }
-                        else
-                        {
-                            break;
-                        }
-                    }
-
-                    tokens.Add(
-                        expresion.Substring(inicio, indice - inicio)
-                    );
-
-                    continue;
-                }
-
-                // Identificadores.
-                if (char.IsLetter(caracter) || caracter == '_')
-                {
-                    int inicio = indice;
-                    indice++;
-
-                    while (indice < expresion.Length &&
-                           (char.IsLetterOrDigit(expresion[indice]) ||
-                            expresion[indice] == '_'))
-                    {
-                        indice++;
-                    }
-
-                    tokens.Add(
-                        expresion.Substring(inicio, indice - inicio)
-                    );
-
-                    continue;
-                }
-
-                if ("+-*/()".Contains(caracter))
-                {
-                    tokens.Add(caracter.ToString());
-                    indice++;
-                    continue;
-                }
-
-                // Caracter no admitido.
-                return new List<string>();
-            }
-
-            return tokens;
-        }
-
-        // =====================================================
-        // SUMA Y RESTA
-        // =====================================================
-        private NodoExpresion? ParseSumaResta(
-            List<string> tokens,
-            ref int indice)
-        {
-            NodoExpresion? izquierda =
-                ParseMultiplicacion(tokens, ref indice);
-
-            if (izquierda == null)
-                return null;
-
-            while (indice < tokens.Count &&
-                   (tokens[indice] == "+" ||
-                    tokens[indice] == "-"))
-            {
-                string operador = tokens[indice++];
-
-                NodoExpresion? derecha =
-                    ParseMultiplicacion(tokens, ref indice);
-
-                if (derecha == null)
-                    return null;
-
-                izquierda = new NodoExpresion
-                {
-                    Operador = operador,
-                    Izquierda = izquierda,
-                    Derecha = derecha
-                };
-            }
-
-            return izquierda;
-        }
-
-        // =====================================================
-        // MULTIPLICACION Y DIVISION
-        // =====================================================
-        private NodoExpresion? ParseMultiplicacion(
-            List<string> tokens,
-            ref int indice)
-        {
-            NodoExpresion? izquierda =
-                ParseFactor(tokens, ref indice);
-
-            if (izquierda == null)
-                return null;
-
-            while (indice < tokens.Count &&
-                   (tokens[indice] == "*" ||
-                    tokens[indice] == "/"))
-            {
-                string operador = tokens[indice++];
-
-                NodoExpresion? derecha =
-                    ParseFactor(tokens, ref indice);
-
-                if (derecha == null)
-                    return null;
-
-                izquierda = new NodoExpresion
-                {
-                    Operador = operador,
-                    Izquierda = izquierda,
-                    Derecha = derecha
-                };
-            }
-
-            return izquierda;
-        }
-
-        // =====================================================
-        // FACTORES, PARENTESIS Y SIGNOS UNARIOS
-        // =====================================================
-        private NodoExpresion? ParseFactor(
-            List<string> tokens,
-            ref int indice)
-        {
-            if (indice >= tokens.Count)
-                return null;
-
-            if (tokens[indice] == "(")
-            {
-                indice++;
-
-                NodoExpresion? expresion =
-                    ParseSumaResta(tokens, ref indice);
-
-                if (expresion == null ||
-                    indice >= tokens.Count ||
-                    tokens[indice] != ")")
-                {
-                    return null;
-                }
-
-                indice++;
-                return expresion;
-            }
-
-            if (tokens[indice] == "-")
-            {
-                indice++;
-
-                NodoExpresion? valor =
-                    ParseFactor(tokens, ref indice);
-
-                if (valor == null)
-                    return null;
-
-                return new NodoExpresion
-                {
-                    Operador = "NEG",
-                    Izquierda = valor,
-                    EsUnario = true
-                };
-            }
-
-            if (tokens[indice] == "+")
-            {
-                indice++;
-                return ParseFactor(tokens, ref indice);
-            }
-
-            string token = tokens[indice];
-
-            if (token == "*" || token == "/" || token == ")")
-                return null;
-
-            indice++;
-
-            return new NodoExpresion
-            {
-                Valor = token,
-                EsOperando = true
-            };
-        }
-
-        // =====================================================
-        // GENERAR CUADRUPLOS
-        // =====================================================
-        private string GenerarCuadruplos(NodoExpresion nodo)
-        {
-            if (nodo.EsOperando)
-                return nodo.Valor;
-
-            string izquierda =
-                GenerarCuadruplos(nodo.Izquierda!);
-
-            if (nodo.EsUnario)
-            {
-                string temporalUnario = NuevaTemporal();
-
-                AgregarCuadruplo(
-                    "NEG",
-                    izquierda,
-                    string.Empty,
-                    temporalUnario
-                );
-
-                return temporalUnario;
-            }
-
-            string derecha =
-                GenerarCuadruplos(nodo.Derecha!);
-
-            string temporal = NuevaTemporal();
-
-            AgregarCuadruplo(
-                nodo.Operador,
-                izquierda,
-                derecha,
-                temporal
-            );
-
-            return temporal;
         }
 
         private void AgregarCuadruplo(
@@ -969,6 +452,40 @@ namespace AnalizadorLexico
         // =====================================================
         // GENERAR TRIPLOS
         // =====================================================
+        private static void ValidarOperadores(IReadOnlyCollection<Cuadruplo> instrucciones)
+        {
+            HashSet<string> operadoresSoportados = new(StringComparer.Ordinal)
+            {
+                "=", "NEG", "NOT", "POS", "+", "-", "*", "/", "%", "^",
+                ">", "<", ">=", "<=", "==", "!=", "AND", "OR",
+                "LABEL", "GOTO", "IF_FALSE", "IF_TRUE", "READ", "PRINT", "RETURN", "CLEAR", "LOCATE"
+            };
+
+            foreach (Cuadruplo instruccion in instrucciones)
+            {
+                if (!operadoresSoportados.Contains(instruccion.Operador))
+                    throw new InvalidOperationException($"El IR contiene la instrucción no soportada '{instruccion.Operador}'.");
+            }
+        }
+
+        private static void ValidarEtiquetas(IReadOnlyCollection<Cuadruplo> instrucciones)
+        {
+            HashSet<string> etiquetas = instrucciones
+                .Where(c => c.Operador == "LABEL")
+                .Select(c => c.Resultado)
+                .ToHashSet(StringComparer.Ordinal);
+
+            if (instrucciones.Where(c => c.Operador == "LABEL").Any(c => string.IsNullOrWhiteSpace(c.Resultado)) ||
+                etiquetas.Count != instrucciones.Count(c => c.Operador == "LABEL"))
+                throw new InvalidOperationException("El IR contiene etiquetas vacías o duplicadas.");
+
+            foreach (Cuadruplo instruccion in instrucciones.Where(c => c.Operador == "GOTO" || c.Operador == "IF_FALSE" || c.Operador == "IF_TRUE"))
+            {
+                if (!etiquetas.Contains(instruccion.Resultado))
+                    throw new InvalidOperationException($"El salto {instruccion.Operador} apunta a la etiqueta inexistente '{instruccion.Resultado}'.");
+            }
+        }
+
         private void GenerarTriplos()
         {
             _triplos.Clear();
@@ -1123,196 +640,7 @@ namespace AnalizadorLexico
             }
         }
 
-        // =====================================================
-        // NOTACION POSTFIJA
-        // =====================================================
-        private void GenerarPostfija(
-            NodoExpresion nodo,
-            List<string> salida)
-        {
-            if (nodo.EsOperando)
-            {
-                salida.Add(nodo.Valor);
-                return;
-            }
-
-            if (nodo.Izquierda != null)
-                GenerarPostfija(nodo.Izquierda, salida);
-
-            if (nodo.Derecha != null)
-                GenerarPostfija(nodo.Derecha, salida);
-
-            salida.Add(nodo.Operador);
-        }
-
-        // =====================================================
-        // NOTACION PREFIJA
-        // =====================================================
-        private void GenerarPrefija(
-            NodoExpresion nodo,
-            List<string> salida)
-        {
-            if (nodo.EsOperando)
-            {
-                salida.Add(nodo.Valor);
-                return;
-            }
-
-            salida.Add(nodo.Operador);
-
-            if (nodo.Izquierda != null)
-                GenerarPrefija(nodo.Izquierda, salida);
-
-            if (nodo.Derecha != null)
-                GenerarPrefija(nodo.Derecha, salida);
-        }
-
-        // =====================================================
-        // CODIGO P
-        // =====================================================
-     
-
-        private void GenerarCodigoP(NodoExpresion nodo)
-
-        {
-
-            if (nodo.EsOperando)
-
-            {
-
-                if (EsCadena(nodo.Valor) || EsNumero(nodo.Valor))
-
-                {
-
-                    _codigoP.Add($"ldc {nodo.Valor}");
-
-                }
-
-                else
-
-                {
-
-                    _codigoP.Add($"lod {nodo.Valor}");
-
-                }
-
-                return;
-
-            }
-
-            if (nodo.Izquierda != null)
-
-                GenerarCodigoP(nodo.Izquierda);
-
-            if (nodo.Derecha != null)
-
-                GenerarCodigoP(nodo.Derecha);
-
-            switch (nodo.Operador)
-
-            {
-
-                case "+":
-
-                    _codigoP.Add("adi");
-
-                    break;
-
-                case "-":
-
-                    _codigoP.Add("sbi");
-
-                    break;
-
-                case "*":
-
-                    _codigoP.Add("mli");
-
-                    break;
-
-                case "/":
-
-                    _codigoP.Add("dvi");
-
-                    break;
-
-                case "NEG":
-
-                    _codigoP.Add("ngi");
-
-                    break;
-
-            }
-
-        }
-
-
-        // =====================================================
-        // EVALUAR EXPRESIONES NUMERICAS
-        // =====================================================
-        private double? EvaluarExpresion(NodoExpresion nodo)
-        {
-            if (nodo.EsOperando)
-            {
-                if (double.TryParse(
-                    nodo.Valor,
-                    NumberStyles.Any,
-                    CultureInfo.InvariantCulture,
-                    out double numero))
-                {
-                    return numero;
-                }
-
-                if (_valoresVariables.TryGetValue(
-                    nodo.Valor, out double valorVariable))
-                {
-                    return valorVariable;
-                }
-
-                return null;
-            }
-
-            double? izquierda = nodo.Izquierda != null
-                ? EvaluarExpresion(nodo.Izquierda)
-                : null;
-
-            if (nodo.EsUnario)
-            {
-                return izquierda.HasValue
-                    ? -izquierda.Value
-                    : null;
-            }
-
-            double? derecha = nodo.Derecha != null
-                ? EvaluarExpresion(nodo.Derecha)
-                : null;
-
-            if (!izquierda.HasValue || !derecha.HasValue)
-                return null;
-
-            switch (nodo.Operador)
-            {
-                case "+":
-                    return izquierda.Value + derecha.Value;
-                case "-":
-                    return izquierda.Value - derecha.Value;
-                case "*":
-                    return izquierda.Value * derecha.Value;
-                case "/":
-                    if (derecha.Value == 0)
-                        return null;
-
-                    return izquierda.Value / derecha.Value;
-                default:
-                    return null;
-            }
-
-        }
-
-        // =====================================================
-        // UTILIDADES
-        // =====================================================
-        private bool EsNumero(string texto)
+        private static bool EsNumero(string texto)
         {
             return Regex.IsMatch(
                 texto,
@@ -1327,18 +655,13 @@ namespace AnalizadorLexico
                    texto.EndsWith("\"");
         }
 
-        private string FormatoNumero(double valor)
-        {
-            return valor.ToString("G", CultureInfo.InvariantCulture);
-        }
-
-        public string NuevaTemporal()
+        private string NuevaTemporal()
         {
             _contadorTemporales++;
             return $"t{_contadorTemporales}";
         }
 
-        public string NuevaEtiqueta()
+        private string NuevaEtiqueta()
         {
             _contadorEtiquetas++;
             return $"L{_contadorEtiquetas}";

@@ -358,7 +358,7 @@
             ParseARG3();
             Consumir("CD9", "Se esperaba ':' después de ARG3 en opcion");
             ParseS();
-            Consumir("CD11", "Se esperaba 'terminar' al final de opcion");
+            Consumir("CD10", "Se esperaba 'terminar' al final de opcion");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
         }
 
@@ -367,7 +367,7 @@
             Consumir("PR8", "Se esperaba 'predefinido'");
             Consumir("CD9", "Se esperaba ':' después de 'predefinido'");
             ParseS();
-            Consumir("CD11", "Se esperaba 'terminar' al final de predefinido");
+            Consumir("CD10", "Se esperaba 'terminar' al final de predefinido");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
         }
 

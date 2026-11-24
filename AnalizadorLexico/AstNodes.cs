@@ -115,8 +115,4 @@ namespace AnalizadorLexico
         public BlockNode Cuerpo { get; set; } = new();
     }
 
-    public class RawExpressionNode : ExpressionNode
-    {
-        public string Texto { get; set; } = "";
-    }
 }

@@ -2,7 +2,7 @@
 
 namespace AnalizadorLexico
 {
-    public class Recorrido
+    public class AnalizadorLexico
     {
         // Cadena de conexión
         protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
