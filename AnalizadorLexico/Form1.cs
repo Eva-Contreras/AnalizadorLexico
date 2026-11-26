@@ -11,17 +11,11 @@ namespace AnalizadorLexico
         private AnalizadorLexico _analizadorLexico = new();
         private AnalizadorSintactico _sintactico = new();
         private AnalizadorSemantico _semantico = new();
-        private readonly DataGridView _dgvIROriginal = new();
-        private readonly DataGridView _dgvIROptimizado = new();
-        private readonly RichTextBox _rtxInformeOptimizacion = new();
-        private readonly Button _btnOptimizar = new();
-        private readonly Label _lblCostoEstimado = new();
         private List<Cuadruplo> _codigoIntermedioOriginal = new();
 
         public Form1()
         {
             InitializeComponent();
-            CrearPestanaOptimizacion();
 
             // Eventos de los botones que se conservan.
             btnCargar.Click += btnCargar_Click;
@@ -30,6 +24,7 @@ namespace AnalizadorLexico
             btnGuardarTokens.Click += btnGuardarTokens_Click;
             btnSintaxis.Click += btnSintaxis_Click;
             btnGenerar.Click += btnGenerar_Click;
+            btnOptimizar.Click += btnOptimizar_Click;
 
 
             // Configuracion del editor de codigo.
@@ -55,79 +50,6 @@ namespace AnalizadorLexico
             LimpiarSalidasCodigoIntermedio();
         }
 
-        private void CrearPestanaOptimizacion()
-        {
-            tabPageResultadoOptimizacion.BackColor = SystemColors.GradientActiveCaption;
-            tabPageResultadoOptimizacion.Padding = new Padding(12);
-
-            TableLayoutPanel contenido = new()
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 4,
-                Padding = new Padding(8)
-            };
-            contenido.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
-            contenido.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
-            contenido.RowStyles.Add(new RowStyle(SizeType.Percent, 34));
-            contenido.RowStyles.Add(new RowStyle(SizeType.Percent, 32));
-            tabPageResultadoOptimizacion.Controls.Add(contenido);
-
-            FlowLayoutPanel acciones = new() { Dock = DockStyle.Fill, FlowDirection = FlowDirection.LeftToRight };
-            _btnOptimizar.Text = "Optimizar código intermedio";
-            _btnOptimizar.AutoSize = true;
-            _btnOptimizar.Enabled = false;
-            _btnOptimizar.Click += btnOptimizar_Click;
-            _lblCostoEstimado.AutoSize = true;
-            _lblCostoEstimado.Text = "El costo mostrado es una cuenta de instrucciones IR, no una medición de ejecución.";
-            _lblCostoEstimado.Margin = new Padding(16, 10, 3, 3);
-            acciones.Controls.Add(_btnOptimizar);
-            acciones.Controls.Add(_lblCostoEstimado);
-            contenido.Controls.Add(acciones, 0, 0);
-
-            ConfigurarTablaIR(_dgvIROriginal);
-            ConfigurarTablaIR(_dgvIROptimizado);
-            contenido.Controls.Add(CrearGrupoIR("IR original", _dgvIROriginal), 0, 1);
-            contenido.Controls.Add(CrearGrupoIR("IR optimizado", _dgvIROptimizado), 0, 2);
-
-            _rtxInformeOptimizacion.Dock = DockStyle.Fill;
-            _rtxInformeOptimizacion.ReadOnly = true;
-            _rtxInformeOptimizacion.Font = new Font("Consolas", 9F);
-            contenido.Controls.Add(CrearGrupoIR("Reglas y análisis de flujo de datos", _rtxInformeOptimizacion), 0, 3);
-        }
-
-        private static GroupBox CrearGrupoIR(string titulo, Control contenido)
-        {
-            GroupBox grupo = new()
-            {
-                Text = titulo,
-                Dock = DockStyle.Fill,
-                BackColor = SystemColors.GradientInactiveCaption,
-                Padding = new Padding(8),
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold)
-            };
-            contenido.Dock = DockStyle.Fill;
-            grupo.Controls.Add(contenido);
-            return grupo;
-        }
-
-        private static void ConfigurarTablaIR(DataGridView tabla)
-        {
-            tabla.AllowUserToAddRows = false;
-            tabla.AllowUserToDeleteRows = false;
-            tabla.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            tabla.BackgroundColor = SystemColors.Window;
-            tabla.Dock = DockStyle.Fill;
-            tabla.ReadOnly = true;
-            tabla.RowHeadersVisible = false;
-            tabla.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            tabla.Columns.Add("Numero", "No.");
-            tabla.Columns.Add("Operador", "Operador");
-            tabla.Columns.Add("Argumento1", "Arg1");
-            tabla.Columns.Add("Argumento2", "Arg2");
-            tabla.Columns.Add("Resultado", "Resultado");
-        }
-
         private void btnOptimizar_Click(object? sender, EventArgs e)
         {
             if (_codigoIntermedioOriginal.Count == 0)
@@ -138,21 +60,35 @@ namespace AnalizadorLexico
 
             try
             {
+                TipoOptimizacion tipoSeleccionado = cmbTipoOptimizacion.SelectedItem?.ToString() switch
+                {
+                    "Local" => TipoOptimizacion.Local,
+                    "Ciclos" => TipoOptimizacion.Ciclos,
+                    "Global" => TipoOptimizacion.Global,
+                    "Mirilla" => TipoOptimizacion.Mirilla,
+                    _ => TipoOptimizacion.Todas
+                };
+                List<Cuadruplo> codigoOriginalCopia = _codigoIntermedioOriginal.Select(c => new Cuadruplo
+                {
+                    Numero = c.Numero,
+                    Operador = c.Operador,
+                    Argumento1 = c.Argumento1,
+                    Argumento2 = c.Argumento2,
+                    Resultado = c.Resultado
+                }).ToList();
                 Optimizacion optimizador = new();
-                List<Cuadruplo> codigoOptimizado = optimizador.Optimizar(_codigoIntermedioOriginal);
+                List<Cuadruplo> codigoOptimizado = optimizador.Optimizar(codigoOriginalCopia, tipoSeleccionado);
                 CodigoIntermedio generadorOptimizado = new();
                 generadorOptimizado.GenerarDesdeCuadruplos(codigoOptimizado);
 
-                MostrarCuadruplos(_dgvIROriginal, _codigoIntermedioOriginal);
-                MostrarCuadruplos(_dgvIROptimizado, codigoOptimizado);
                 int diferencia = optimizador.InstruccionesAntesOptimizacion - optimizador.InstruccionesDespuesOptimizacion;
                 int diferenciaCosto = optimizador.CostoAntesOptimizacion - optimizador.CostoDespuesOptimizacion;
-                _lblCostoEstimado.Text = $"Instrucciones: {optimizador.InstruccionesAntesOptimizacion} → {optimizador.InstruccionesDespuesOptimizacion} (Δ {diferencia:+#;-#;0}); costo: {optimizador.CostoAntesOptimizacion} → {optimizador.CostoDespuesOptimizacion} (Δ {diferenciaCosto:+#;-#;0}); pila: {optimizador.PilaEstimadaAntesOptimizacion} → {optimizador.PilaEstimadaDespuesOptimizacion}; registros: {optimizador.RegistrosEstimadosAntesOptimizacion} → {optimizador.RegistrosEstimadosDespuesOptimizacion}; memoria: {optimizador.MemoriaEstimadaAntesOptimizacion} → {optimizador.MemoriaEstimadaDespuesOptimizacion} bytes";
-                _rtxInformeOptimizacion.Text = optimizador.InformeOptimizacion + Environment.NewLine + Environment.NewLine +
-                    "Flujo de datos del IR optimizado:" + Environment.NewLine +
-                    optimizador.AnalizarFlujoDeDatos(codigoOptimizado) + Environment.NewLine + Environment.NewLine +
-                    "Código de tres direcciones optimizado:" + Environment.NewLine +
-                    generadorOptimizado.CodigoTresDireccionesCuadruplos;
+                lblCostoEstimado.Text = $"Instrucciones: {optimizador.InstruccionesAntesOptimizacion} → {optimizador.InstruccionesDespuesOptimizacion} (Δ {diferencia:+#;-#;0}); costo estructural: {optimizador.CostoAntesOptimizacion} → {optimizador.CostoDespuesOptimizacion} (Δ {diferenciaCosto:+#;-#;0}); estimaciones — pila: {optimizador.PilaEstimadaAntesOptimizacion} → {optimizador.PilaEstimadaDespuesOptimizacion}, registros: {optimizador.RegistrosEstimadosAntesOptimizacion} → {optimizador.RegistrosEstimadosDespuesOptimizacion}, memoria: {optimizador.MemoriaEstimadaAntesOptimizacion} → {optimizador.MemoriaEstimadaDespuesOptimizacion} bytes.";
+                rtxCodigoTresDireccionesOpt.Text = generadorOptimizado.CodigoTresDireccionesCuadruplos;
+                rtxCodigoPOpt.Text = string.Join(Environment.NewLine, generadorOptimizado.CodigoP);
+                rtxNotacionPolacaOpt.Text = generadorOptimizado.NotacionPrefija;
+                rtxNotacionPolacaInversaOpt.Text = generadorOptimizado.NotacionPostfija;
+                rtxInformeOptimizacion.Text = optimizador.InformeOptimizacion;
                 tabControl1.SelectedTab = tabPageOptimizacion;
                 tabControlOptimizacion.SelectedTab = tabPageResultadoOptimizacion;
             }
@@ -160,13 +96,6 @@ namespace AnalizadorLexico
             {
                 MessageBox.Show(ex.Message, "No se pudo optimizar el IR", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private static void MostrarCuadruplos(DataGridView tabla, IEnumerable<Cuadruplo> cuadruplos)
-        {
-            tabla.Rows.Clear();
-            foreach (Cuadruplo cuadruplo in cuadruplos)
-                tabla.Rows.Add(cuadruplo.Numero, cuadruplo.Operador, cuadruplo.Argumento1, cuadruplo.Argumento2, cuadruplo.Resultado);
         }
 
         // ========================================================
@@ -361,7 +290,7 @@ namespace AnalizadorLexico
                 Argumento2 = c.Argumento2,
                 Resultado = c.Resultado
             }).ToList();
-            _btnOptimizar.Enabled = _codigoIntermedioOriginal.Count > 0;
+            btnOptimizar.Enabled = _codigoIntermedioOriginal.Count > 0;
 
             // ----------------------------------------------------
             // 4.1 CUADRUPLOS
@@ -458,11 +387,13 @@ namespace AnalizadorLexico
             dgvCuadruplos.Rows.Clear();
             dgvTriplos.Rows.Clear();
             _codigoIntermedioOriginal.Clear();
-            _dgvIROriginal.Rows.Clear();
-            _dgvIROptimizado.Rows.Clear();
-            _rtxInformeOptimizacion.Clear();
-            _lblCostoEstimado.Text = "El costo mostrado es una cuenta de instrucciones IR, no una medición de ejecución.";
-            _btnOptimizar.Enabled = false;
+            rtxCodigoTresDireccionesOpt.Clear();
+            rtxCodigoPOpt.Clear();
+            rtxNotacionPolacaOpt.Clear();
+            rtxNotacionPolacaInversaOpt.Clear();
+            rtxInformeOptimizacion.Clear();
+            lblCostoEstimado.Text = "Las cifras de costo, memoria, registros y pila son estimaciones, no mediciones reales.";
+            btnOptimizar.Enabled = false;
 
             richTextBox2.Clear();
             richTextBox6.Clear();

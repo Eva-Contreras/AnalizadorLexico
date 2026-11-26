@@ -101,6 +101,22 @@
             tabControlOptimizacion = new TabControl();
             tabPageTiposOptimizacion = new TabPage();
             tabPageResultadoOptimizacion = new TabPage();
+            tableLayoutOptimizacion = new TableLayoutPanel();
+            panelAccionesOptimizacion = new FlowLayoutPanel();
+            lblTipoOptimizacion = new Label();
+            cmbTipoOptimizacion = new ComboBox();
+            btnOptimizar = new Button();
+            lblCostoEstimado = new Label();
+            groupCodigoTresDireccionesOpt = new GroupBox();
+            rtxCodigoTresDireccionesOpt = new RichTextBox();
+            groupCodigoPOpt = new GroupBox();
+            rtxCodigoPOpt = new RichTextBox();
+            groupNotacionPolacaOpt = new GroupBox();
+            rtxNotacionPolacaOpt = new RichTextBox();
+            groupNotacionPolacaInversaOpt = new GroupBox();
+            rtxNotacionPolacaInversaOpt = new RichTextBox();
+            groupInformeOptimizacion = new GroupBox();
+            rtxInformeOptimizacion = new RichTextBox();
             richTextBoxTiposOptimizacion = new RichTextBox();
             groupBox4 = new GroupBox();
             label7 = new Label();
@@ -893,6 +909,162 @@
             tabPageResultadoOptimizacion.Size = new Size(1122, 871);
             tabPageResultadoOptimizacion.TabIndex = 1;
             tabPageResultadoOptimizacion.Text = "Ejecución";
+            tabPageResultadoOptimizacion.Controls.Add(tableLayoutOptimizacion);
+            //
+            // tableLayoutOptimizacion
+            //
+            tableLayoutOptimizacion.ColumnCount = 2;
+            tableLayoutOptimizacion.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.RowCount = 4;
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Absolute, 120F));
+            tableLayoutOptimizacion.Controls.Add(panelAccionesOptimizacion, 0, 0);
+            tableLayoutOptimizacion.Controls.Add(groupCodigoTresDireccionesOpt, 0, 1);
+            tableLayoutOptimizacion.Controls.Add(groupCodigoPOpt, 1, 1);
+            tableLayoutOptimizacion.Controls.Add(groupNotacionPolacaOpt, 0, 2);
+            tableLayoutOptimizacion.Controls.Add(groupNotacionPolacaInversaOpt, 1, 2);
+            tableLayoutOptimizacion.Controls.Add(groupInformeOptimizacion, 0, 3);
+            tableLayoutOptimizacion.SetColumnSpan(groupInformeOptimizacion, 2);
+            tableLayoutOptimizacion.Dock = DockStyle.Fill;
+            tableLayoutOptimizacion.Name = "tableLayoutOptimizacion";
+            tableLayoutOptimizacion.Padding = new Padding(6);
+            tableLayoutOptimizacion.TabIndex = 0;
+            //
+            // panelAccionesOptimizacion
+            //
+            panelAccionesOptimizacion.Controls.Add(lblTipoOptimizacion);
+            panelAccionesOptimizacion.Controls.Add(cmbTipoOptimizacion);
+            panelAccionesOptimizacion.Controls.Add(btnOptimizar);
+            panelAccionesOptimizacion.Controls.Add(lblCostoEstimado);
+            panelAccionesOptimizacion.Dock = DockStyle.Fill;
+            panelAccionesOptimizacion.FlowDirection = FlowDirection.LeftToRight;
+            panelAccionesOptimizacion.Name = "panelAccionesOptimizacion";
+            panelAccionesOptimizacion.WrapContents = false;
+            //
+            // lblTipoOptimizacion
+            //
+            lblTipoOptimizacion.AutoSize = true;
+            lblTipoOptimizacion.Margin = new Padding(3, 10, 3, 3);
+            lblTipoOptimizacion.Name = "lblTipoOptimizacion";
+            lblTipoOptimizacion.Text = "Pasada:";
+            //
+            // cmbTipoOptimizacion
+            //
+            cmbTipoOptimizacion.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbTipoOptimizacion.Items.AddRange(new object[] { "Local", "Ciclos", "Global", "Mirilla", "Todas" });
+            cmbTipoOptimizacion.Margin = new Padding(3, 5, 8, 3);
+            cmbTipoOptimizacion.Name = "cmbTipoOptimizacion";
+            cmbTipoOptimizacion.Size = new Size(140, 33);
+            cmbTipoOptimizacion.TabIndex = 0;
+            cmbTipoOptimizacion.SelectedIndex = 4;
+            //
+            // btnOptimizar
+            //
+            btnOptimizar.Enabled = false;
+            btnOptimizar.Margin = new Padding(3, 3, 12, 3);
+            btnOptimizar.Name = "btnOptimizar";
+            btnOptimizar.Size = new Size(130, 35);
+            btnOptimizar.TabIndex = 1;
+            btnOptimizar.Text = "Optimizar";
+            btnOptimizar.UseVisualStyleBackColor = true;
+            //
+            // lblCostoEstimado
+            //
+            lblCostoEstimado.AutoEllipsis = true;
+            lblCostoEstimado.AutoSize = false;
+            lblCostoEstimado.Margin = new Padding(3, 3, 3, 3);
+            lblCostoEstimado.Name = "lblCostoEstimado";
+            lblCostoEstimado.Size = new Size(620, 40);
+            lblCostoEstimado.Text = "Las cifras de costo, memoria, registros y pila son estimaciones, no mediciones reales.";
+            lblCostoEstimado.TextAlign = ContentAlignment.MiddleLeft;
+            //
+            // groupCodigoTresDireccionesOpt
+            //
+            groupCodigoTresDireccionesOpt.Controls.Add(rtxCodigoTresDireccionesOpt);
+            groupCodigoTresDireccionesOpt.Dock = DockStyle.Fill;
+            groupCodigoTresDireccionesOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupCodigoTresDireccionesOpt.Name = "groupCodigoTresDireccionesOpt";
+            groupCodigoTresDireccionesOpt.Padding = new Padding(8);
+            groupCodigoTresDireccionesOpt.Text = "Código de tres direcciones";
+            //
+            // rtxCodigoTresDireccionesOpt
+            //
+            rtxCodigoTresDireccionesOpt.Dock = DockStyle.Fill;
+            rtxCodigoTresDireccionesOpt.Font = new Font("Consolas", 9F);
+            rtxCodigoTresDireccionesOpt.ReadOnly = true;
+            rtxCodigoTresDireccionesOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxCodigoTresDireccionesOpt.WordWrap = false;
+            //
+            // groupCodigoPOpt
+            //
+            groupCodigoPOpt.Controls.Add(rtxCodigoPOpt);
+            groupCodigoPOpt.Dock = DockStyle.Fill;
+            groupCodigoPOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupCodigoPOpt.Name = "groupCodigoPOpt";
+            groupCodigoPOpt.Padding = new Padding(8);
+            groupCodigoPOpt.Text = "Código P";
+            //
+            // rtxCodigoPOpt
+            //
+            rtxCodigoPOpt.Dock = DockStyle.Fill;
+            rtxCodigoPOpt.Font = new Font("Consolas", 9F);
+            rtxCodigoPOpt.ReadOnly = true;
+            rtxCodigoPOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxCodigoPOpt.WordWrap = false;
+            //
+            // groupNotacionPolacaOpt
+            //
+            groupNotacionPolacaOpt.Controls.Add(rtxNotacionPolacaOpt);
+            groupNotacionPolacaOpt.Dock = DockStyle.Fill;
+            groupNotacionPolacaOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupNotacionPolacaOpt.Name = "groupNotacionPolacaOpt";
+            groupNotacionPolacaOpt.Padding = new Padding(8);
+            groupNotacionPolacaOpt.Text = "Notación polaca";
+            //
+            // rtxNotacionPolacaOpt
+            //
+            rtxNotacionPolacaOpt.Dock = DockStyle.Fill;
+            rtxNotacionPolacaOpt.Font = new Font("Consolas", 9F);
+            rtxNotacionPolacaOpt.ReadOnly = true;
+            rtxNotacionPolacaOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxNotacionPolacaOpt.WordWrap = false;
+            //
+            // groupNotacionPolacaInversaOpt
+            //
+            groupNotacionPolacaInversaOpt.Controls.Add(rtxNotacionPolacaInversaOpt);
+            groupNotacionPolacaInversaOpt.Dock = DockStyle.Fill;
+            groupNotacionPolacaInversaOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupNotacionPolacaInversaOpt.Name = "groupNotacionPolacaInversaOpt";
+            groupNotacionPolacaInversaOpt.Padding = new Padding(8);
+            groupNotacionPolacaInversaOpt.Text = "Notación polaca inversa";
+            //
+            // rtxNotacionPolacaInversaOpt
+            //
+            rtxNotacionPolacaInversaOpt.Dock = DockStyle.Fill;
+            rtxNotacionPolacaInversaOpt.Font = new Font("Consolas", 9F);
+            rtxNotacionPolacaInversaOpt.ReadOnly = true;
+            rtxNotacionPolacaInversaOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxNotacionPolacaInversaOpt.WordWrap = false;
+            //
+            // groupInformeOptimizacion
+            //
+            groupInformeOptimizacion.Controls.Add(rtxInformeOptimizacion);
+            groupInformeOptimizacion.Dock = DockStyle.Fill;
+            groupInformeOptimizacion.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupInformeOptimizacion.Name = "groupInformeOptimizacion";
+            groupInformeOptimizacion.Padding = new Padding(8);
+            groupInformeOptimizacion.Text = "Informe de optimización";
+            //
+            // rtxInformeOptimizacion
+            //
+            rtxInformeOptimizacion.Dock = DockStyle.Fill;
+            rtxInformeOptimizacion.Font = new Font("Consolas", 9F);
+            rtxInformeOptimizacion.ReadOnly = true;
+            rtxInformeOptimizacion.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxInformeOptimizacion.WordWrap = true;
             //
             // groupBox4
             //
@@ -1286,6 +1458,22 @@
         private TabControl tabControlOptimizacion;
         private TabPage tabPageTiposOptimizacion;
         private TabPage tabPageResultadoOptimizacion;
+        private TableLayoutPanel tableLayoutOptimizacion;
+        private FlowLayoutPanel panelAccionesOptimizacion;
+        private Label lblTipoOptimizacion;
+        private ComboBox cmbTipoOptimizacion;
+        private Button btnOptimizar;
+        private Label lblCostoEstimado;
+        private GroupBox groupCodigoTresDireccionesOpt;
+        private RichTextBox rtxCodigoTresDireccionesOpt;
+        private GroupBox groupCodigoPOpt;
+        private RichTextBox rtxCodigoPOpt;
+        private GroupBox groupNotacionPolacaOpt;
+        private RichTextBox rtxNotacionPolacaOpt;
+        private GroupBox groupNotacionPolacaInversaOpt;
+        private RichTextBox rtxNotacionPolacaInversaOpt;
+        private GroupBox groupInformeOptimizacion;
+        private RichTextBox rtxInformeOptimizacion;
         private RichTextBox richTextBoxTiposOptimizacion;
         private Label label6;
         private PictureBox pictureBox4;

@@ -6,6 +6,15 @@ using System.Text.RegularExpressions;
 
 namespace AnalizadorLexico
 {
+    public enum TipoOptimizacion
+    {
+        Local,
+        Ciclos,
+        Global,
+        Mirilla,
+        Todas
+    }
+
     public class Optimizacion
     {
         private readonly List<string> _informeOptimizacion = new();
@@ -24,9 +33,10 @@ namespace AnalizadorLexico
         public int MemoriaEstimadaAntesOptimizacion { get; private set; }
         public int MemoriaEstimadaDespuesOptimizacion { get; private set; }
         public string InformeOptimizacion => string.Join(Environment.NewLine, _informeOptimizacion);
-        public List<Cuadruplo> Optimizar(IReadOnlyCollection<Cuadruplo> codigo)
+        public List<Cuadruplo> Optimizar(IReadOnlyCollection<Cuadruplo> codigo, TipoOptimizacion tipo = TipoOptimizacion.Todas)
         {
             ArgumentNullException.ThrowIfNull(codigo);
+            if (!Enum.IsDefined(tipo)) throw new ArgumentOutOfRangeException(nameof(tipo));
             List<Cuadruplo> optimizado = codigo.Select(ClonarCuadruplo).ToList();
             ValidarOperadores(optimizado);
             ValidarEtiquetas(optimizado);
@@ -40,11 +50,19 @@ namespace AnalizadorLexico
             RegistrosEstimadosAntesOptimizacion = ContarTemporales(optimizado);
             MemoriaEstimadaAntesOptimizacion = EstimarMemoria(optimizado);
 
-            OptimizarConstantesLocales(optimizado);
-            AplicarOptimizacionDeBucles(optimizado);
-            AplicarOptimizacionGlobal(optimizado);
-            EliminarTemporalesMuertos(optimizado);
-            AplicarOptimizacionDeMirilla(optimizado);
+            List<Cuadruplo> codigoAntesOptimizacion = optimizado.Select(ClonarCuadruplo).ToList();
+            _informeOptimizacion.Add($"Pasada seleccionada: {tipo}.");
+            if (tipo is TipoOptimizacion.Local or TipoOptimizacion.Todas)
+                OptimizarConstantesLocales(optimizado);
+            if (tipo is TipoOptimizacion.Ciclos or TipoOptimizacion.Todas)
+                AplicarOptimizacionDeBucles(optimizado);
+            if (tipo is TipoOptimizacion.Global or TipoOptimizacion.Todas)
+            {
+                AplicarOptimizacionGlobal(optimizado);
+                EliminarTemporalesMuertos(optimizado);
+            }
+            if (tipo is TipoOptimizacion.Mirilla or TipoOptimizacion.Todas)
+                AplicarOptimizacionDeMirilla(optimizado);
             RenumerarCuadruplos(optimizado);
 
             ValidarOperadores(optimizado);
@@ -55,6 +73,8 @@ namespace AnalizadorLexico
             PilaEstimadaDespuesOptimizacion = EstimarPicoPila(optimizado);
             RegistrosEstimadosDespuesOptimizacion = ContarTemporales(optimizado);
             MemoriaEstimadaDespuesOptimizacion = EstimarMemoria(optimizado);
+            if (CuadruplosIguales(codigoAntesOptimizacion, optimizado))
+                _informeOptimizacion.Add("No hubo cambios en el código para la pasada seleccionada.");
             _informeOptimizacion.Add($"Bloques básicos analizados: {BloquesBasicos}.");
             _informeOptimizacion.Add($"Instrucciones IR: {InstruccionesAntesOptimizacion} → {InstruccionesDespuesOptimizacion}.");
             _informeOptimizacion.Add($"Temporales distintos: {TemporalesAntesOptimizacion} → {TemporalesDespuesOptimizacion}.");
@@ -62,6 +82,14 @@ namespace AnalizadorLexico
             _informeOptimizacion.Add("Costo: estimación por pesos de IR, no medición real de registros, memoria, pila o tiempo de máquina.");
             return optimizado;
         }
+
+        private static bool CuadruplosIguales(IReadOnlyList<Cuadruplo> izquierda, IReadOnlyList<Cuadruplo> derecha) =>
+            izquierda.Count == derecha.Count && izquierda.Zip(derecha).All(par =>
+                par.First.Numero == par.Second.Numero &&
+                par.First.Operador == par.Second.Operador &&
+                par.First.Argumento1 == par.Second.Argumento1 &&
+                par.First.Argumento2 == par.Second.Argumento2 &&
+                par.First.Resultado == par.Second.Resultado);
 
         public string AnalizarFlujoDeDatos(IReadOnlyCollection<Cuadruplo> codigo)
         {
@@ -217,105 +245,34 @@ namespace AnalizadorLexico
         private static bool TryPlegarConstantes(Cuadruplo instruccion, out string resultado)
         {
             resultado = string.Empty;
-            if (!double.TryParse(instruccion.Argumento1, NumberStyles.Float, CultureInfo.InvariantCulture, out double izquierda) ||
-                !double.TryParse(instruccion.Argumento2, NumberStyles.Float, CultureInfo.InvariantCulture, out double derecha))
+            if (instruccion.Operador is not "+" and not "-" and not "*" ||
+                (!instruccion.Argumento1.Contains('.') && !instruccion.Argumento1.Contains('e') && !instruccion.Argumento1.Contains('E')) ||
+                (!instruccion.Argumento2.Contains('.') && !instruccion.Argumento2.Contains('e') && !instruccion.Argumento2.Contains('E')) ||
+                !decimal.TryParse(instruccion.Argumento1, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal izquierda) ||
+                !decimal.TryParse(instruccion.Argumento2, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal derecha))
                 return false;
 
-            double valor;
-            switch (instruccion.Operador)
+            try
             {
-                case "+": valor = izquierda + derecha; break;
-                case "-": valor = izquierda - derecha; break;
-                case "*": valor = izquierda * derecha; break;
-                case "/":
-                    if (derecha == 0) return false;
-                    valor = izquierda / derecha;
-                    break;
-                default: return false;
+                decimal valor = instruccion.Operador switch
+                {
+                    "+" => izquierda + derecha,
+                    "-" => izquierda - derecha,
+                    "*" => izquierda * derecha,
+                    _ => throw new InvalidOperationException()
+                };
+                resultado = valor.ToString(CultureInfo.InvariantCulture);
+                return true;
             }
-
-            if (!double.IsFinite(valor)) return false;
-            resultado = valor.ToString("G", CultureInfo.InvariantCulture);
-            return true;
+            catch (OverflowException)
+            {
+                return false;
+            }
         }
 
         private void AplicarOptimizacionDeBucles(List<Cuadruplo> instrucciones)
         {
-            int movimientos = 0;
-            bool huboMovimiento;
-            do
-            {
-                huboMovimiento = false;
-                Dictionary<string, int> indicesEtiquetas = instrucciones
-                    .Select((instruccion, indice) => (instruccion, indice))
-                    .Where(x => x.instruccion.Operador == "LABEL")
-                    .ToDictionary(x => x.instruccion.Resultado, x => x.indice, StringComparer.Ordinal);
-
-                for (int fin = 0; fin < instrucciones.Count; fin++)
-                {
-                    Cuadruplo salto = instrucciones[fin];
-                    if (salto.Operador != "GOTO" || !indicesEtiquetas.TryGetValue(salto.Resultado, out int inicio) || inicio >= fin)
-                        continue;
-
-                    int saltosAlEncabezado = instrucciones.Count(c =>
-                        (c.Operador is "GOTO" or "IF_FALSE" or "IF_TRUE") && c.Resultado == salto.Resultado);
-                    if (saltosAlEncabezado != 1) continue;
-
-                    HashSet<string> modificadas = new(StringComparer.Ordinal);
-                    for (int i = inicio + 1; i < fin; i++)
-                    {
-                        Cuadruplo instruccion = instrucciones[i];
-                        if (instruccion.Operador == "=" && !EsTemporal(instruccion.Resultado))
-                            modificadas.Add(instruccion.Resultado);
-                        else if (instruccion.Operador == "READ")
-                            modificadas.Add(instruccion.Argumento1);
-                    }
-
-                    for (int i = inicio + 1; i < fin; i++)
-                    {
-                        Cuadruplo candidato = instrucciones[i];
-                        if (candidato.Operador is not "-" and not "*" || !EsTemporal(candidato.Resultado))
-                            continue;
-                        if ((!EsNumero(candidato.Argumento1) && !EsIdentificador(candidato.Argumento1)) ||
-                            (!EsNumero(candidato.Argumento2) && !EsIdentificador(candidato.Argumento2)))
-                            continue;
-                        if ((EsIdentificador(candidato.Argumento1) && modificadas.Contains(candidato.Argumento1)) ||
-                            (EsIdentificador(candidato.Argumento2) && modificadas.Contains(candidato.Argumento2)))
-                            continue;
-                        if (instrucciones.Count(instruccion =>
-                                ObtenerDefiniciones(instruccion).Contains(candidato.Resultado)) != 1)
-                            continue;
-
-                        int bloqueInicio = inicio + 1;
-                        for (int j = inicio + 1; j < i; j++)
-                            if (instrucciones[j].Operador == "LABEL") bloqueInicio = j + 1;
-                        if (Enumerable.Range(bloqueInicio, i - bloqueInicio).Any(j =>
-                                instrucciones[j].Operador is "GOTO" or "IF_FALSE" or "IF_TRUE" or "READ" or "PRINT" or "RETURN" or "CLEAR" or "LOCATE"))
-                            continue;
-
-                        bool usadoDentroDelCiclo = false;
-                        bool usadoFueraDelCiclo = false;
-                        for (int j = 0; j < instrucciones.Count; j++)
-                        {
-                            if (!ObtenerUsos(instrucciones[j]).Contains(candidato.Resultado)) continue;
-                            if (j > i && j < fin) usadoDentroDelCiclo = true;
-                            else if (j <= inicio || j >= fin) usadoFueraDelCiclo = true;
-                        }
-                        if (!usadoDentroDelCiclo || usadoFueraDelCiclo) continue;
-
-                        instrucciones.RemoveAt(i);
-                        instrucciones.Insert(inicio, candidato);
-                        movimientos++;
-                        huboMovimiento = true;
-                        break;
-                    }
-
-                    if (huboMovimiento) break;
-                }
-            } while (huboMovimiento);
-
-            if (movimientos > 0)
-                _informeOptimizacion.Add($"Ciclos: se movieron {movimientos} expresiones invariantes seguras fuera de ciclos.");
+            _informeOptimizacion.Add("Ciclos: no se movieron expresiones; el IR actual no permite probar que la operación se ejecutaría exactamente en las mismas rutas.");
         }
 
         private void AplicarOptimizacionGlobal(List<Cuadruplo> instrucciones)
@@ -360,22 +317,24 @@ namespace AnalizadorLexico
                         }
                     }
 
+                    List<string> definiciones = ObtenerDefiniciones(instruccion).ToList();
+                    foreach (string definicion in definiciones)
+                    {
+                        copias.Remove(definicion);
+                        foreach (string alias in copias
+                            .Where(copia => copia.Value == definicion)
+                            .Select(copia => copia.Key)
+                            .ToList())
+                            copias.Remove(alias);
+                    }
+
                     if (instruccion.Operador == "=")
                     {
-                        copias.Remove(instruccion.Resultado);
                         if (!EsTemporal(instruccion.Argumento1) && EsLiteral(instruccion.Argumento1))
                             copias[instruccion.Resultado] = instruccion.Argumento1;
-                        else if (EsIdentificador(instruccion.Argumento1) || EsTemporal(instruccion.Argumento1))
+                        else if ((EsIdentificador(instruccion.Argumento1) || EsTemporal(instruccion.Argumento1)) &&
+                                 instruccion.Argumento1 != instruccion.Resultado)
                             copias[instruccion.Resultado] = instruccion.Argumento1;
-                    }
-                    else if (DefineResultado(instruccion.Operador))
-                    {
-                        copias.Remove(instruccion.Resultado);
-                        copias.Remove(instruccion.Resultado);
-                    }
-                    else if (instruccion.Operador == "READ")
-                    {
-                        copias.Remove(instruccion.Argumento1);
                     }
 
                     foreach (string operandoModificado in ObtenerDefiniciones(instruccion))
@@ -405,7 +364,7 @@ namespace AnalizadorLexico
                 for (int i = bloque.Fin; i >= bloque.Inicio; i--)
                 {
                     Cuadruplo instruccion = instrucciones[i];
-                    if (EsTemporal(instruccion.Resultado) && EsOperacionPuraEliminable(instruccion.Operador) && !vivas.Contains(instruccion.Resultado))
+                    if (EsTemporal(instruccion.Resultado) && instruccion.Operador == "=" && !vivas.Contains(instruccion.Resultado))
                     {
                         indicesEliminar.Add(i);
                         continue;
@@ -439,7 +398,7 @@ namespace AnalizadorLexico
                 cambio = false;
                 for (int bloqueId = 0; bloqueId < bloques.Count; bloqueId++)
                 {
-                    HashSet<string> entrada;
+                    HashSet<string>? entrada;
                     if (bloques[bloqueId].Predecesores.Count == 0)
                         entrada = new HashSet<string>(StringComparer.Ordinal);
                     else
@@ -569,14 +528,11 @@ namespace AnalizadorLexico
 
         private static bool EsOperacionAritmetica(string operador) => operador is "+" or "-" or "*" or "/";
 
-        private static bool EsOperacionPuraEliminable(string operador) =>
-            operador is "=" or "NEG" or "POS" or "NOT" or "+" or "-" or "*" or "/" or "%" or "^" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR";
-
         private static string ConstruirClaveExpresion(Cuadruplo instruccion)
         {
             string izquierda = instruccion.Argumento1;
             string derecha = instruccion.Argumento2;
-            if (instruccion.Operador is "+" or "*")
+            if (instruccion.Operador == "*")
                 (izquierda, derecha) = string.CompareOrdinal(izquierda, derecha) <= 0
                     ? (izquierda, derecha)
                     : (derecha, izquierda);
