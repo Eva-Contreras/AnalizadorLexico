@@ -5,8 +5,8 @@ namespace AnalizadorLexico
     public class AnalizadorLexico
     {
         // Cadena de conexión
-        protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
-        //protected string connectionString = "Server=tcp:Anapaula,1433;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        //protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=tcp:Anapaula,1433;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -124,7 +124,7 @@ namespace AnalizadorLexico
                                 else if (int.TryParse(fdcVal, out int estadoDestino))
                                 {
                                     _estadosFinalCadena.Add(estado);
-                                    _tabla[(estado, "FDC")] = estadoDestino; 
+                                    _tabla[(estado, "FDC")] = estadoDestino;
                                 }
                             }
                             continue;
@@ -301,15 +301,15 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-              //return "_" + c.ToString();
-            return c.ToString();
+                //return "_" + c.ToString();
+                return c.ToString();
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
 
             return null;
         }
-        public (List<(int linea, string valor, string token)> tokens,List<(int linea, string valor, string error)> errores, LinkedList<(int id, string nombre)> simbolos) AnalizarPrograma(string textoCompleto)
+        public (List<(int linea, string valor, string token)> tokens, List<(int linea, string valor, string error)> errores, LinkedList<(int id, string nombre)> simbolos) AnalizarPrograma(string textoCompleto)
         {
             CargarTabla();
             var tokens = new List<(int, string, string)>();
@@ -498,7 +498,7 @@ namespace AnalizadorLexico
         private bool EsDelimitadorOOperador(char c)
         {
             return c == '=' || c == ';' || c == ',' || c == '(' || c == ')' ||
-                   c == '{' || c == '}' || c == ':' || c == '<' || c == '>' ;
+                   c == '{' || c == '}' || c == ':' || c == '<' || c == '>';
         }
         private bool EsCaracterEspecial(char c)
         {
@@ -513,7 +513,7 @@ namespace AnalizadorLexico
             if (tieneSigno)
             {
                 numero += linea[i];
-                i++; 
+                i++;
             }
 
             bool tienePunto = false;
