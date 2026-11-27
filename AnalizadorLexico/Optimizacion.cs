@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace AnalizadorLexico
 {
@@ -28,7 +29,7 @@ namespace AnalizadorLexico
             // 2. CAMBIO DE ORDEN: Primero Bucles, luego Locales
             AplicarOptimizacionesBucles(codigo);       // <-- Se mueve aquí
             AplicarOptimizacionesGlobales(codigo);
-            AplicarOptimizacionesLocales(codigo);      // <-- Ahora se aplica después
+            AplicarOptimizacionesLocales(codigo);
             AplicarOptimizacionesMirilla(codigo);
             EliminarTemporalesMuertos(codigo);
 
@@ -52,113 +53,132 @@ namespace AnalizadorLexico
         private void AplicarOptimizacionesLocales(List<Cuadruplo> codigo)
         {
             Dictionary<string, string> constantes = new(StringComparer.Ordinal);
-            Dictionary<string, string> origenes = new(StringComparer.Ordinal);
 
             for (int i = 0; i < codigo.Count; i++)
             {
-                var c = codigo[i];
+                Cuadruplo instruccion = codigo[i];
+                if (instruccion.Operador == "LABEL") constantes.Clear();
+                bool operandosEranLiterales = EsNumero(instruccion.Argumento1) &&
+                    (UsaArgumento2(instruccion.Operador) ? EsNumero(instruccion.Argumento2) : true);
 
-                if (c.Operador is "LABEL" or "GOTO" or "IF_FALSE" or "IF_TRUE")
+                SustituirConstantesEnUsos(instruccion, constantes);
+                bool plegada = TryEvaluarConstante(instruccion, operandosEranLiterales, out string resultado);
+                if (plegada)
+                {
+                    string expresion = FormatearExpresion(instruccion);
+                    instruccion.Operador = "=";
+                    instruccion.Argumento1 = resultado;
+                    instruccion.Argumento2 = string.Empty;
+                    LogOptimizacion.Add($"[Local] Plegado de constantes: {expresion} → {resultado}.");
+                }
+                else
+                {
+                    AplicarIdentidadAlgebraica(instruccion);
+                }
+
+                if (instruccion.Operador == "READ")
+                {
+                    constantes.Remove(instruccion.Argumento1);
+                }
+                else if (instruccion.Operador == "CALL")
                 {
                     constantes.Clear();
-                    origenes.Clear();
                 }
-
-                string argumentoOriginal1 = c.Argumento1;
-                string argumentoOriginal2 = c.Argumento2;
-                string expresionOriginal1 = ObtenerExpresion(argumentoOriginal1, origenes);
-                string expresionOriginal2 = ObtenerExpresion(argumentoOriginal2, origenes);
-                bool plegadoConstante = false;
-
-                if (constantes.TryGetValue(c.Argumento1, out string? constante1))
+                else if (instruccion.Operador == "=")
                 {
-                    c.Argumento1 = constante1;
-                    LogOptimizacion.Add($"[Local] Propagación de constantes: se reemplazó '{argumentoOriginal1}' por '{constante1}'.");
-                }
-                if (constantes.TryGetValue(c.Argumento2, out string? constante2))
-                {
-                    c.Argumento2 = constante2;
-                    LogOptimizacion.Add($"[Local] Propagación de constantes: se reemplazó '{argumentoOriginal2}' por '{constante2}'.");
-                }
-
-                // Plegado de constantes (ej. 5 + 3 = 8)
-                if (EsOperadorAritmetico(c.Operador) &&
-                    TryParseNumero(c.Argumento1, out double val1) &&
-                    TryParseNumero(c.Argumento2, out double val2))
-                {
-                    double resultado = c.Operador switch
-                    {
-                        "+" => val1 + val2,
-                        "-" => val1 - val2,
-                        "*" => val1 * val2,
-                        "/" => val2 != 0 ? val1 / val2 : double.NaN,
-                        _ => double.NaN
-                    };
-
-                    if (!double.IsNaN(resultado))
-                    {
-                        string resStr = resultado.ToString(CultureInfo.InvariantCulture);
-                        string operadorOriginal = c.Operador;
-                        string expresion = $"{expresionOriginal1} {operadorOriginal} {expresionOriginal2}";
-                        LogOptimizacion.Add($"[Local] Se aplicó Plegado de Constantes: {expresion} = {resStr} (en {c.Resultado}).");
-                        c.Operador = "=";
-                        c.Argumento1 = resStr;
-                        c.Argumento2 = "_";
-                        constantes[c.Resultado] = resStr;
-                        origenes[c.Resultado] = expresion;
-                        plegadoConstante = true;
-                    }
-                }
-
-                if (!plegadoConstante && c.Operador == "=")
-                {
-                    if (origenes.TryGetValue(argumentoOriginal1, out string? origenAsignado) &&
-                        EsNumero(c.Argumento1))
-                    {
-                        LogOptimizacion.Add($"[Local] Se aplicó Plegado de Constantes: {origenAsignado} = {c.Argumento1} (asignado a {c.Resultado}).");
-                        origenes[c.Resultado] = origenAsignado;
-                    }
-                    else if (!origenes.ContainsKey(c.Resultado))
-                    {
-                        origenes.Remove(c.Resultado);
-                    }
-
-                    if (EsNumero(c.Argumento1))
-                        constantes[c.Resultado] = c.Argumento1;
+                    if (EsNumero(instruccion.Argumento1))
+                        constantes[instruccion.Resultado] = instruccion.Argumento1;
                     else
-                        constantes.Remove(c.Resultado);
+                        constantes.Remove(instruccion.Resultado);
                 }
-                else if (!plegadoConstante && !string.IsNullOrEmpty(c.Resultado))
+                else if (DefineResultado(instruccion.Operador))
                 {
-                    constantes.Remove(c.Resultado);
-                    if (!origenes.ContainsKey(c.Resultado))
-                        origenes.Remove(c.Resultado);
+                    constantes.Remove(instruccion.Resultado);
                 }
 
-                // Simplificación algebraica (ej. x * 1 = x, x + 0 = x)
-                if (EsOperadorAritmetico(c.Operador))
-                {
-                    if (c.Operador == "*" && c.Argumento2 == "1")
+                if (instruccion.Operador is "GOTO" or "IF_FALSE" or "IF_TRUE" or "RETURN")
+                    constantes.Clear();
+            }
+        }
+
+        private static void SustituirConstantesEnUsos(Cuadruplo instruccion, Dictionary<string, string> constantes)
+        {
+            if (UsaArgumento1(instruccion.Operador) && constantes.TryGetValue(instruccion.Argumento1, out string? constante1))
+                instruccion.Argumento1 = constante1;
+            if (UsaArgumento2(instruccion.Operador) && constantes.TryGetValue(instruccion.Argumento2, out string? constante2))
+                instruccion.Argumento2 = constante2;
+        }
+
+        private static bool TryEvaluarConstante(Cuadruplo instruccion, bool operandosEranLiterales, out string resultado)
+        {
+            resultado = string.Empty;
+            bool operacionAritmetica = instruccion.Operador is "+" or "-" or "*" or "/" or "%" or "^" or "NEG" or "POS";
+            if (operacionAritmetica && !operandosEranLiterales) return false;
+            if (!TryParseNumero(instruccion.Argumento1, out double izquierda) || !double.IsFinite(izquierda))
+                return false;
+
+            double valor;
+            switch (instruccion.Operador)
+            {
+                case "NEG": valor = -izquierda; break;
+                case "POS": valor = izquierda; break;
+                case "NOT": valor = izquierda == 0 ? 1 : 0; break;
+                default:
+                    if (!TryParseNumero(instruccion.Argumento2, out double derecha) || !double.IsFinite(derecha))
+                        return false;
+                    switch (instruccion.Operador)
                     {
-                        LogOptimizacion.Add($"[Local] Simplificación algebraica: {c.Argumento1} * 1 → {c.Argumento1}");
-                        c.Operador = "="; c.Argumento2 = "_";
+                        case "+": valor = izquierda + derecha; break;
+                        case "-": valor = izquierda - derecha; break;
+                        case "*": valor = izquierda * derecha; break;
+                        case "/":
+                            if (derecha == 0 || EsEnteroLiteral(instruccion.Argumento1) && EsEnteroLiteral(instruccion.Argumento2) && izquierda % derecha != 0)
+                                return false;
+                            valor = izquierda / derecha;
+                            break;
+                        case "%": if (derecha == 0) return false; valor = izquierda % derecha; break;
+                        case "^": valor = Math.Pow(izquierda, derecha); break;
+                        case ">": valor = izquierda > derecha ? 1 : 0; break;
+                        case "<": valor = izquierda < derecha ? 1 : 0; break;
+                        case ">=": valor = izquierda >= derecha ? 1 : 0; break;
+                        case "<=": valor = izquierda <= derecha ? 1 : 0; break;
+                        case "==": valor = izquierda == derecha ? 1 : 0; break;
+                        case "!=": valor = izquierda != derecha ? 1 : 0; break;
+                        case "AND": valor = izquierda != 0 && derecha != 0 ? 1 : 0; break;
+                        case "OR": valor = izquierda != 0 || derecha != 0 ? 1 : 0; break;
+                        default: return false;
                     }
-                    else if (c.Operador == "*" && c.Argumento1 == "1")
-                    {
-                        LogOptimizacion.Add($"[Local] Simplificación algebraica: 1 * {c.Argumento2} → {c.Argumento2}");
-                        c.Operador = "="; c.Argumento1 = c.Argumento2; c.Argumento2 = "_";
-                    }
-                    else if (c.Operador == "+" && c.Argumento2 == "0")
-                    {
-                        LogOptimizacion.Add($"[Local] Simplificación algebraica: {c.Argumento1} + 0 → {c.Argumento1}");
-                        c.Operador = "="; c.Argumento2 = "_";
-                    }
-                    else if (c.Operador == "-" && c.Argumento2 == "0")
-                    {
-                        LogOptimizacion.Add($"[Local] Simplificación algebraica: {c.Argumento1} - 0 → {c.Argumento1}");
-                        c.Operador = "="; c.Argumento2 = "_";
-                    }
-                }
+                    break;
+            }
+
+            if (!double.IsFinite(valor)) return false;
+            resultado = valor.ToString("G", CultureInfo.InvariantCulture);
+            return true;
+        }
+
+        private static string FormatearExpresion(Cuadruplo instruccion) =>
+            instruccion.Operador is "NEG" or "POS" or "NOT"
+                ? $"{instruccion.Operador} {instruccion.Argumento1}"
+                : $"{instruccion.Argumento1} {instruccion.Operador} {instruccion.Argumento2}";
+
+        private void AplicarIdentidadAlgebraica(Cuadruplo instruccion)
+        {
+            bool identidadDerecha = instruccion.Operador == "*" && instruccion.Argumento2 == "1" ||
+                (instruccion.Operador is "+" or "-") && instruccion.Argumento2 == "0";
+            if (identidadDerecha)
+            {
+                string operacion = $"{instruccion.Argumento1} {instruccion.Operador} {instruccion.Argumento2}";
+                instruccion.Operador = "=";
+                instruccion.Argumento2 = string.Empty;
+                LogOptimizacion.Add($"[Local] Simplificación algebraica: {operacion} → {instruccion.Argumento1}.");
+            }
+            else if (instruccion.Operador == "*" && instruccion.Argumento1 == "1")
+            {
+                string operacion = $"1 * {instruccion.Argumento2}";
+                instruccion.Operador = "=";
+                instruccion.Argumento1 = instruccion.Argumento2;
+                instruccion.Argumento2 = string.Empty;
+                LogOptimizacion.Add($"[Local] Simplificación algebraica: {operacion} → {instruccion.Argumento1}.");
             }
         }
 
@@ -167,22 +187,19 @@ namespace AnalizadorLexico
             bool seElimino;
             do
             {
-                HashSet<string> usados = codigo
-                    .SelectMany(c => new[] { c.Argumento1, c.Argumento2 })
-                    .Where(argumento => !string.IsNullOrEmpty(argumento))
-                    .ToHashSet(StringComparer.Ordinal);
+                HashSet<string> usados = new(StringComparer.Ordinal);
+                foreach (Cuadruplo instruccion in codigo)
+                    foreach (string uso in ObtenerUsos(instruccion))
+                        usados.Add(uso);
 
                 seElimino = false;
                 for (int i = codigo.Count - 1; i >= 0; i--)
                 {
-                    Cuadruplo c = codigo[i];
-                    bool esTemporal = c.Resultado.StartsWith("t", StringComparison.Ordinal);
-                    bool esOperacionSinEfectos = c.Operador == "=" ||
-                        EsOperadorAritmetico(c.Operador) || c.Operador is "NEG" or "POS" or "NOT";
-
-                    if (esTemporal && esOperacionSinEfectos && !usados.Contains(c.Resultado))
+                    Cuadruplo instruccion = codigo[i];
+                    if (EsTemporal(instruccion.Resultado) && EsOperacionPuraEliminable(instruccion.Operador) &&
+                        !usados.Contains(instruccion.Resultado))
                     {
-                        LogOptimizacion.Add($"[Local] Código muerto eliminado: temporal {c.Resultado}.");
+                        LogOptimizacion.Add($"[Global] Se eliminó la definición muerta del temporal {instruccion.Resultado}.");
                         codigo.RemoveAt(i);
                         seElimino = true;
                     }
@@ -190,17 +207,71 @@ namespace AnalizadorLexico
             } while (seElimino);
         }
 
-        private static string ObtenerExpresion(string operando, Dictionary<string, string> origenes)
+        private static IEnumerable<string> ObtenerUsos(Cuadruplo instruccion)
         {
-            if (origenes.TryGetValue(operando, out string? origen))
-                return $"({origen})";
-            return operando;
+            if (UsaArgumento1(instruccion.Operador) && !string.IsNullOrEmpty(instruccion.Argumento1))
+                yield return instruccion.Argumento1;
+            if (UsaArgumento2(instruccion.Operador) && !string.IsNullOrEmpty(instruccion.Argumento2))
+                yield return instruccion.Argumento2;
+            if (instruccion.Operador == "LOCATE")
+            {
+                foreach (Match coincidencia in Regex.Matches(instruccion.Argumento1, @"(?<![A-Za-z0-9_])t\d+(?![A-Za-z0-9_])", RegexOptions.IgnoreCase))
+                    yield return coincidencia.Value;
+            }
         }
 
-        private static bool TryParseNumero(string valor, out double numero)
+        private static bool UsaArgumento1(string operador) =>
+            operador is "=" or "NEG" or "POS" or "NOT" or "+" or "-" or "*" or "/" or "%" or "^" or
+                ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR" or
+                "IF_FALSE" or "IF_TRUE" or "PRINT" or "RETURN" or "PARAM";
+
+        private static bool UsaArgumento2(string operador) =>
+            operador is "+" or "-" or "*" or "/" or "%" or "^" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR";
+
+        private static bool DefineResultado(string operador) =>
+            operador is "=" or "NEG" or "POS" or "NOT" or "+" or "-" or "*" or "/" or "%" or "^" or
+                ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR" or "CALL";
+
+        private static bool EsOperacionPuraEliminable(string operador) =>
+            operador is "=" or "NEG" or "POS" or "NOT" or "+" or "-" or "*" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR";
+
+        private static bool EsVariable(string valor) =>
+            Regex.IsMatch(valor, @"^[A-Za-z_][A-Za-z0-9_]*$") || EsTemporal(valor);
+
+        private static bool EsTemporal(string valor) =>
+            Regex.IsMatch(valor, @"^t\d+$", RegexOptions.IgnoreCase);
+
+        private static bool EsEscrituraDe(Cuadruplo instruccion, string variable) =>
+            instruccion.Operador == "READ" && instruccion.Argumento1 == variable ||
+            DefineResultado(instruccion.Operador) && instruccion.Resultado == variable;
+
+        private static bool EsBarreraDePropagacion(string operador) =>
+            operador is "LABEL" or "GOTO" or "IF_FALSE" or "IF_TRUE" or "READ" or "CALL" or "RETURN" or "LOCATE";
+
+        private static bool SustituirUso(Cuadruplo instruccion, string destino, string origen)
         {
-            return double.TryParse(valor, NumberStyles.Float, CultureInfo.InvariantCulture, out numero);
+            bool sustituido = false;
+            if (UsaArgumento1(instruccion.Operador) && instruccion.Argumento1 == destino)
+            {
+                instruccion.Argumento1 = origen;
+                sustituido = true;
+            }
+            if (UsaArgumento2(instruccion.Operador) && instruccion.Argumento2 == destino)
+            {
+                instruccion.Argumento2 = origen;
+                sustituido = true;
+            }
+            return sustituido;
         }
+
+        private static bool TryParseNumero(string valor, out double numero) =>
+            double.TryParse(valor, NumberStyles.Float, CultureInfo.InvariantCulture, out numero);
+
+        private static bool EsNumero(string valor) =>
+            TryParseNumero(valor, out double numero) && double.IsFinite(numero);
+
+        private static bool EsEnteroLiteral(string valor) =>
+            Regex.IsMatch(valor, @"^-?\d+$");
 
         // ========================================================
         // 2. OPTIMIZACIÓN DE MIRILLA (Peephole - Saltos redundantes)
@@ -211,7 +282,7 @@ namespace AnalizadorLexico
             {
                 var actual = codigo[i];
 
-                if ((actual.Operador is "IF_TRUE" or "IF_FALSE") && TryParseNumero(actual.Argumento1, out double condicion))
+                if ((actual.Operador is "IF_TRUE" or "IF_FALSE") && TryParseNumero(actual.Argumento1, out double condicion) && double.IsFinite(condicion))
                 {
                     bool esVerdadera = condicion != 0;
                     bool tomaSalto = actual.Operador == "IF_TRUE" ? esVerdadera : !esVerdadera;
@@ -248,111 +319,84 @@ namespace AnalizadorLexico
         }
 
         // ========================================================
-        // 3. OPTIMIZACIÓN GLOBAL (Propagación de copias)
+        // 3. PROPAGACIÓN DE COPIAS EN SECUENCIAS SIN SALTOS
         // ========================================================
         private void AplicarOptimizacionesGlobales(List<Cuadruplo> codigo)
         {
-            // Buscamos asignaciones tipo "var1 = var2" y reemplazamos los usos de var1 por var2 si es seguro
             for (int i = 0; i < codigo.Count; i++)
             {
-                var c = codigo[i];
-                if (c.Operador == "=" && !EsNumero(c.Argumento1) && !c.Argumento1.StartsWith("\"")) // Es una copia (ej: a = b)
+                Cuadruplo asignacion = codigo[i];
+                if (asignacion.Operador != "=" || !EsVariable(asignacion.Resultado) ||
+                    !EsVariable(asignacion.Argumento1) || asignacion.Resultado == asignacion.Argumento1)
+                    continue;
+
+                string destino = asignacion.Resultado;
+                string origen = asignacion.Argumento1;
+                for (int j = i + 1; j < codigo.Count; j++)
                 {
-                    string origen = c.Argumento1;
-                    string destino = c.Resultado;
+                    Cuadruplo siguiente = codigo[j];
+                    if (EsBarreraDePropagacion(siguiente.Operador)) break;
+                    if (EsEscrituraDe(siguiente, destino) || EsEscrituraDe(siguiente, origen)) break;
 
-                    // Verificar en las siguientes líneas si 'destino' se usa y no se modifica
-                    for (int j = i + 1; j < codigo.Count; j++)
-                    {
-                        var sig = codigo[j];
+                    bool sustituido = SustituirUso(siguiente, destino, origen);
+                    if (sustituido)
+                        LogOptimizacion.Add($"[Global] Propagación de copias: '{destino}' se sustituyó por '{origen}'.");
 
-                        // Si modifican 'destino', dejamos de propagar (por seguridad)
-                        if (sig.Resultado == destino)
-                            break;
-
-                        // Si usa 'destino', lo cambiamos por 'origen'
-                        if (sig.Argumento1 == destino)
-                        {
-                            sig.Argumento1 = origen;
-                            LogOptimizacion.Add($"[Global] Propagación de copias: se reemplazó '{destino}' por '{origen}'.");
-                        }
-                        if (sig.Argumento2 == destino)
-                        {
-                            sig.Argumento2 = origen;
-                            LogOptimizacion.Add($"[Global] Propagación de copias: se reemplazó '{destino}' por '{origen}'.");
-                        }
-                    }
+                    if (siguiente.Operador is "IF_TRUE" or "IF_FALSE" or "GOTO" or "RETURN") break;
                 }
             }
         }
 
         // ========================================================
-        // 4. OPTIMIZACIÓN DE BUCLES (Invariantes de bucle)
+        // 4. MOVIMIENTO CONSERVADOR DE INVARIANTES DE CICLO
         // ========================================================
         private void AplicarOptimizacionesBucles(List<Cuadruplo> codigo)
         {
-            for (int i = 0; i < codigo.Count; i++)
+            for (int inicio = 0; inicio < codigo.Count; inicio++)
             {
-                if (codigo[i].Operador == "LABEL")
+                if (codigo[inicio].Operador != "LABEL") continue;
+                string etiquetaInicio = codigo[inicio].Resultado;
+                List<int> regresos = codigo
+                    .Select((instruccion, indice) => (instruccion, indice))
+                    .Where(x => x.indice > inicio && (x.instruccion.Operador is "GOTO" or "IF_TRUE" or "IF_FALSE"))
+                    .Where(x => x.instruccion.Resultado == etiquetaInicio)
+                    .Select(x => x.indice)
+                    .ToList();
+                if (regresos.Count != 1) continue;
+
+                int fin = regresos[0];
+                if (inicio + 1 >= fin) continue;
+
+                Cuadruplo candidato = codigo[inicio + 1];
+                if (candidato.Operador is not "+" and not "-" and not "*") continue;
+                if (!EsTemporal(candidato.Resultado) ||
+                    (!EsNumero(candidato.Argumento1) && !EsVariable(candidato.Argumento1)) ||
+                    (!EsNumero(candidato.Argumento2) && !EsVariable(candidato.Argumento2)))
+                    continue;
+                if (codigo.Skip(inicio + 1).Take(fin - inicio - 1).Any(c => c.Operador == "CALL")) continue;
+                if (codigo.Count(c => c.Resultado == candidato.Resultado && DefineResultado(c.Operador)) != 1) continue;
+
+                bool operandoModificado = codigo.Skip(inicio + 1).Take(fin - inicio - 1)
+                    .Any(c => EsEscrituraDe(c, candidato.Argumento1) || EsEscrituraDe(c, candidato.Argumento2));
+                if (operandoModificado) continue;
+
+                bool usoDentro = false;
+                bool usoFuera = false;
+                for (int indice = 0; indice < codigo.Count; indice++)
                 {
-                    string etiquetaInicio = codigo[i].Resultado;
-                    int posGOTO = -1;
-
-                    // Buscar el GOTO que cierra el ciclo (ignorando los IF)
-                    for (int j = i + 1; j < codigo.Count; j++)
-                    {
-                        if (codigo[j].Operador == "GOTO" && codigo[j].Resultado == etiquetaInicio)
-                        {
-                            posGOTO = j;
-                            break;
-                        }
-                    }
-
-                    if (posGOTO > i)
-                    {
-                        // Buscar operaciones aritméticas dentro del bucle
-                        for (int j = i + 1; j < posGOTO; j++)
-                        {
-                            var op = codigo[j];
-                            if (EsOperadorAritmetico(op.Operador))
-                            {
-                                // Revisar si los argumentos se modifican dentro del bucle
-                                bool arg1SeModifica = false;
-                                bool arg2SeModifica = false;
-
-                                for (int k = i + 1; k < posGOTO; k++)
-                                {
-                                    if (codigo[k].Resultado == op.Argumento1) arg1SeModifica = true;
-                                    if (codigo[k].Resultado == op.Argumento2) arg2SeModifica = true;
-                                }
-
-                                // Si NINGUNO se modifica, es invariante (aunque sean variables)
-                                if (!arg1SeModifica && !arg2SeModifica)
-                                {
-                                    Cuadruplo instruccionInvariante = op;
-                                    codigo.RemoveAt(j);
-
-                                    // Insertar justo antes del LABEL de inicio
-                                    codigo.Insert(i, instruccionInvariante);
-
-                                    LogOptimizacion.Add($"[Bucles] Se sacó operación invariante del bucle {etiquetaInicio}: {instruccionInvariante.Argumento1} {instruccionInvariante.Operador} {instruccionInvariante.Argumento2} → {instruccionInvariante.Resultado}.");
-
-                                    i--;
-                                    posGOTO--;
-                                    j--;
-                                }
-                            }
-                        }
-                    }
+                    if (!ObtenerUsos(codigo[indice]).Contains(candidato.Resultado)) continue;
+                    if (indice > inicio + 1 && indice < fin) usoDentro = true;
+                    else usoFuera = true;
                 }
+                if (!usoDentro || usoFuera) continue;
+
+                codigo.RemoveAt(inicio + 1);
+                codigo.Insert(inicio, candidato);
+                LogOptimizacion.Add($"[Bucles] Se movió '{candidato.Argumento1} {candidato.Operador} {candidato.Argumento2}' fuera del ciclo {etiquetaInicio}; se limitó a suma, resta o multiplicación invariantes.");
+                inicio++;
             }
         }
 
-        private bool EsOperadorAritmetico(string op) => op == "+" || op == "-" || op == "*" || op == "/";
 
-        private bool EsNumero(string val)
-        {
-            return TryParseNumero(val, out _);
-        }
     }
 }
