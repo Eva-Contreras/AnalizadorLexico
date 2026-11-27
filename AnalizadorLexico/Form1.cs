@@ -8,9 +8,10 @@ namespace AnalizadorLexico
 {
     public partial class Form1 : Form
     {
-        private Recorrido r = new();
+        private AnalizadorLexico _analizadorLexico = new();
         private AnalizadorSintactico _sintactico = new();
         private AnalizadorSemantico _semantico = new();
+        private List<Cuadruplo> _codigoIntermedioOriginal = new();
 
         public Form1()
         {
@@ -23,6 +24,7 @@ namespace AnalizadorLexico
             btnGuardarTokens.Click += btnGuardarTokens_Click;
             btnSintaxis.Click += btnSintaxis_Click;
             btnGenerar.Click += btnGenerar_Click;
+            btnOptimizar.Click += btnOptimizar_Click;
 
 
             // Configuracion del editor de codigo.
@@ -46,6 +48,43 @@ namespace AnalizadorLexico
 
             // Limpiar las representaciones intermedias al iniciar.
             LimpiarSalidasCodigoIntermedio();
+        }
+
+        private void btnOptimizar_Click(object? sender, EventArgs e)
+        {
+            if (_codigoIntermedioOriginal.Count == 0)
+            {
+                MessageBox.Show("Primero genere el código intermedio del programa.", "Optimización", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                List<Cuadruplo> codigoOriginalCopia = _codigoIntermedioOriginal.Select(c => new Cuadruplo
+                {
+                    Numero = c.Numero,
+                    Operador = c.Operador,
+                    Argumento1 = c.Argumento1,
+                    Argumento2 = c.Argumento2,
+                    Resultado = c.Resultado
+                }).ToList();
+                Optimizacion optimizador = new();
+                List<Cuadruplo> codigoOptimizado = optimizador.Optimizar(codigoOriginalCopia);
+                CodigoIntermedio generadorOptimizado = new();
+                generadorOptimizado.GenerarDesdeCuadruplos(codigoOptimizado);
+
+                rtxCodigoTresDireccionesOpt.Text = string.Join(Environment.NewLine, codigoOptimizado.Select(c =>
+                    $"{c.Numero}: ({c.Operador}, {c.Argumento1}, {c.Argumento2}, {c.Resultado})"));
+                rtxCodigoPOpt.Text = string.Join(Environment.NewLine, generadorOptimizado.CodigoP);
+                rtxNotacionPolacaOpt.Text = generadorOptimizado.NotacionPrefija;
+                rtxNotacionPolacaInversaOpt.Text = generadorOptimizado.NotacionPostfija;
+                rtxInformeOptimizacion.Text = string.Join(Environment.NewLine, optimizador.LogOptimizacion);
+                tabControl1.SelectedTab = tabPageOptimizacion;
+            }
+            catch (InvalidOperationException ex)
+            {
+                MessageBox.Show(ex.Message, "No se pudo optimizar el IR", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // ========================================================
@@ -73,7 +112,7 @@ namespace AnalizadorLexico
             // ====================================================
 
             var (tokens, erroresLexicos, _) =
-                r.AnalizarPrograma(texto);
+                _analizadorLexico.AnalizarPrograma(texto);
 
             rtxTokens.Clear();
 
@@ -231,7 +270,16 @@ namespace AnalizadorLexico
             CodigoIntermedio generador = new();
 
             var cuadruplos =
-                generador.GenerarDesdeTexto(rtxPrograma.Text);
+                generador.GenerarDesdeAst(_sintactico.AstRoot);
+            _codigoIntermedioOriginal = cuadruplos.Select(c => new Cuadruplo
+            {
+                Numero = c.Numero,
+                Operador = c.Operador,
+                Argumento1 = c.Argumento1,
+                Argumento2 = c.Argumento2,
+                Resultado = c.Resultado
+            }).ToList();
+            btnOptimizar.Enabled = _codigoIntermedioOriginal.Count > 0;
 
             // ----------------------------------------------------
             // 4.1 CUADRUPLOS
@@ -300,7 +348,7 @@ namespace AnalizadorLexico
             if (cuadruplos.Count == 0)
             {
                 MessageBox.Show(
-                    "No se encontraron asignaciones aritméticas compatibles para generar las representaciones intermedias.",
+                    "El programa no generó instrucciones intermedias.",
                     "Código intermedio",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
@@ -327,6 +375,13 @@ namespace AnalizadorLexico
         {
             dgvCuadruplos.Rows.Clear();
             dgvTriplos.Rows.Clear();
+            _codigoIntermedioOriginal.Clear();
+            rtxCodigoTresDireccionesOpt.Clear();
+            rtxCodigoPOpt.Clear();
+            rtxNotacionPolacaOpt.Clear();
+            rtxNotacionPolacaInversaOpt.Clear();
+            rtxInformeOptimizacion.Clear();
+            btnOptimizar.Enabled = false;
 
             richTextBox2.Clear();
             richTextBox6.Clear();
@@ -408,7 +463,7 @@ namespace AnalizadorLexico
                 }
 
                 var (tokens, errores, simbolos) =
-                    r.AnalizarPrograma(texto);
+                    _analizadorLexico.AnalizarPrograma(texto);
 
                 rtxTokens.Clear();
 
@@ -699,7 +754,7 @@ namespace AnalizadorLexico
                 return;
             }
 
-            var (tokens, _, _) = r.AnalizarPrograma(texto);
+            var (tokens, _, _) = _analizadorLexico.AnalizarPrograma(texto);
 
             bool valido = _sintactico.Analizar(tokens);
 
@@ -810,7 +865,7 @@ namespace AnalizadorLexico
             }
 
             // Obtener tokens.
-            var (tokens, _, _) = r.AnalizarPrograma(texto);
+            var (tokens, _, _) = _analizadorLexico.AnalizarPrograma(texto);
 
             // Generar el AST.
             _sintactico.Analizar(tokens);

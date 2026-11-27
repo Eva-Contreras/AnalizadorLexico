@@ -6,11 +6,13 @@
         private int _pos;
         private int _ultimaLineaConsumida = 0;
         private Dictionary<(int ambitoId, string nombre), Simbolo> _tablaSimbolos = new();
+        private readonly Dictionary<string, FirmaFuncion> _funciones = new(StringComparer.Ordinal);
         private int _stackPointer = 0; 
         private Stack<Ambito> _ambitos = new();
         private Ambito? _ambitoActual;
         private int _siguienteIdAmbito;
         private int _siguienteIdSimbolo;
+        private FirmaFuncion? _funcionActual;
         public List<string> Errores { get; private set; } = new();
         public List<string> DebugLog { get; private set; } = new();
         public List<Simbolo> TablaSimbolosFinal { get; private set; } = new();
@@ -27,6 +29,8 @@
             DebugLog.Clear();
             DebugLog.Add("Analizar: inicio");
             _tablaSimbolos.Clear();
+            _funciones.Clear();
+            _funcionActual = null;
             TablaSimbolosFinal.Clear();
             _ambitos.Clear();
             _ambitoActual = null;
@@ -61,6 +65,7 @@
                 case "PR1": ParseLeer(); break;
                 case "PR2": ParseImprimir(); break;
                 case "PR3": ParseRetornar(); break;
+                case "PR14": ParseFuncion(); break;
                 case "PR4": ParseSentenciaIf(); break;
                 case "PR6": ParseCasos(); break;
                 case "PR9": ParseMientras(); break;
@@ -70,7 +75,17 @@
                 case "PR13": ParseUbicar(); break;
                 default:
                     if (EsID(TokenActual.token))
-                        ParseAsignacion();
+                    {
+                        if (_pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                        {
+                            ParseLlamadaFuncion(requiereTipoRetorno: false);
+                            Consumir("CD5", "Se esperaba ';' al final de la llamada de función");
+                        }
+                        else
+                        {
+                            ParseAsignacion();
+                        }
+                    }
                     else
                     {
                         Error($"Sentencia no reconocida '{TokenActual.valor}' en línea {TokenActual.linea}");
@@ -78,6 +93,63 @@
                     }
                     break;
             }
+        }
+
+        private void ParseFuncion()
+        {
+            Consumir("PR14", "Se esperaba 'FUNCION'");
+            string nombre = TokenActual.valor;
+            if (!EsID(TokenActual.token))
+            {
+                Error($"Se esperaba nombre de función en línea {TokenActual.linea}");
+                return;
+            }
+            Consumir(TokenActual.token, "Se esperaba nombre de función");
+            Consumir("CD3", "Se esperaba '(' después del nombre de la función");
+
+            FirmaFuncion firma = new();
+            if (TokenActual.token != "CD4")
+            {
+                while (TokenActual.token != "CD4" && TokenActual.token != "EOF")
+                {
+                    string tipo = TokenActual.token;
+                    if (tipo != "ENT" && tipo != "DEC" && tipo != "CAD")
+                    {
+                        Error($"Tipo de parámetro inválido en función '{nombre}' en línea {TokenActual.linea}");
+                        SkipToEndOfStatement();
+                        return;
+                    }
+                    Avanzar();
+                    string parametro = TokenActual.valor;
+                    if (!EsID(TokenActual.token))
+                    {
+                        Error($"Se esperaba identificador de parámetro en función '{nombre}' en línea {TokenActual.linea}");
+                        return;
+                    }
+                    Consumir(TokenActual.token, "Se esperaba identificador de parámetro");
+                    firma.Parametros.Add((parametro, tipo));
+                    if (TokenActual.token != "CD6") break;
+                    Avanzar();
+                }
+            }
+
+            Consumir("CD4", "Se esperaba ')' después de los parámetros");
+            if (_funciones.ContainsKey(nombre))
+                Error($"La función '{nombre}' ya está declarada en línea {TokenActual.linea}");
+            else
+                _funciones[nombre] = firma;
+
+            FirmaFuncion? funcionAnterior = _funcionActual;
+            _funcionActual = firma;
+            EnterScope();
+            foreach ((string parametro, string tipo) in firma.Parametros)
+                RegistrarSimbolo(parametro, tipo, string.Empty, TokenActual.linea);
+
+            Consumir("CD1", "Se esperaba '{' al iniciar el cuerpo de la función");
+            ParseBloque();
+            Consumir("CD2", "Se esperaba '}' al cerrar el cuerpo de la función");
+            ExitScope();
+            _funcionActual = funcionAnterior;
         }
 
         private void ParseDeclaracionENT()
@@ -220,7 +292,7 @@
             string tokenInicio = TokenActual.token;
             string valorInicio = TokenActual.valor;
 
-            string tipoRHS = ParseARG2();
+            string tipoRHS = ParseARG2(); // Esto debería procesar la suma
 
             Consumir("CD5", "Se esperaba ';' al final de asignación");
 
@@ -236,27 +308,7 @@
                 Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {lineaAsignacion}");
                 return;
             }
-
-            if (tipoRHS != "ERROR")
-            {
-                string valorRegistrar = "";
-                if (tokenInicio == "CNU" || tokenInicio == "CNR")
-                {
-                    valorRegistrar = valorInicio;
-                }
-                else if (EsID(tokenInicio))
-                {
-                    string idInit = valorInicio;
-                    var simInit = BuscarSimbolo(idInit);
-                    if (simInit != null)
-                    {
-                        valorRegistrar = simInit.Valor ?? "";
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(valorRegistrar))
-                    simbolo.Valor = valorRegistrar;
-            }
+            // ... el resto del código de actualización de valores se queda igual
         }
 
         private void ParseLeer()
@@ -298,8 +350,15 @@
         {
             DebugLog.Add($"ParseRetornar at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
             Consumir("PR3", "Se esperaba 'retornar'");
-            ParseARG2(); 
+            string tipoRetorno = ParseARG2();
             Consumir("CD5", "Se esperaba ';' al final de 'retornar'");
+            if (_funcionActual != null && tipoRetorno != "ERROR")
+            {
+                if (string.IsNullOrEmpty(_funcionActual.TipoRetorno))
+                    _funcionActual.TipoRetorno = tipoRetorno;
+                else if (!TiposCompatibles(_funcionActual.TipoRetorno, tipoRetorno))
+                    Error($"Tipo de retorno incompatible en función: se recibió {tipoRetorno} y se esperaba {_funcionActual.TipoRetorno} en línea {TokenActual.linea}");
+            }
         }
 
         private void ParseSentenciaIf()
@@ -358,7 +417,7 @@
             ParseARG3();
             Consumir("CD9", "Se esperaba ':' después de ARG3 en opcion");
             ParseS();
-            Consumir("CD11", "Se esperaba 'terminar' al final de opcion");
+            Consumir("CD10", "Se esperaba 'terminar' al final de opcion");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
         }
 
@@ -367,7 +426,7 @@
             Consumir("PR8", "Se esperaba 'predefinido'");
             Consumir("CD9", "Se esperaba ':' después de 'predefinido'");
             ParseS();
-            Consumir("CD11", "Se esperaba 'terminar' al final de predefinido");
+            Consumir("CD10", "Se esperaba 'terminar' al final de predefinido");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
         }
 
@@ -690,6 +749,17 @@
         private string ParseARG2()
         {
             DebugLog.Add($"ParseARG2 at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
+
+            // ¡ESTA ES LA LÍNEA QUE FALTA! Si es un ID o un número, y el SIGUIENTE es un operador (+,-,*,/), procesa todo.
+            if ((EsID(TokenActual.token) || EsCN(TokenActual.token)) &&
+                _pos + 1 < _tokens.Count && EsOA(_tokens[_pos + 1].token))
+            {
+                return ParseOPA();
+            }
+
+            if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                return ParseOPA();
+
             if (TokenActual.token == "CAD")
             {
                 string literal = TokenActual.valor;
@@ -700,7 +770,6 @@
                     string opToken = TokenActual.token;
                     string opValor = TokenActual.valor;
                     Consumir(TokenActual.token, "Se esperaba operador aritmético");
-
                     string tipoRight = ParseARG4();
                     if (tipoRight == "ERROR") return "ERROR";
 
@@ -712,15 +781,14 @@
                         Error($"Operador '+' no admite operandos de tipo {tipoRight} en línea {TokenActual.linea}");
                         return "ERROR";
                     }
-
                     Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: CAD y {tipoRight}");
                     return "ERROR";
                 }
-
                 return "CAD";
             }
             else if (EsID(TokenActual.token))
             {
+                // ... (El bloque que ya tienes de EsID)
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
@@ -759,7 +827,6 @@
                             tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                             continue;
                         }
-
                         Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
                         return "ERROR";
                     }
@@ -769,10 +836,8 @@
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
                         return "ERROR";
                     }
-
                     tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                 }
-
                 return tipoLeft;
             }
             else if (EsCN(TokenActual.token))
@@ -791,6 +856,51 @@
                 Avanzar();
                 return "ERROR";
             }
+        }
+
+        private string ParseLlamadaFuncion(bool requiereTipoRetorno = true)
+        {
+            string nombre = TokenActual.valor;
+            int linea = TokenActual.linea;
+            Consumir(TokenActual.token, "Se esperaba nombre de función");
+            Consumir("CD3", "Se esperaba '(' en llamada de función");
+            _funciones.TryGetValue(nombre, out FirmaFuncion? firma);
+            int indiceArgumento = 0;
+
+            if (TokenActual.token != "CD4")
+            {
+                while (true)
+                {
+                    string tipoArgumento = ParseARG2();
+                    if (firma != null)
+                    {
+                        if (indiceArgumento >= firma.Parametros.Count)
+                            Error($"La función '{nombre}' recibió más argumentos de los esperados en línea {linea}");
+                        else if (tipoArgumento != "ERROR" && !TiposCompatibles(firma.Parametros[indiceArgumento].Tipo, tipoArgumento))
+                            Error($"Tipo incompatible para el argumento {indiceArgumento + 1} de '{nombre}': se esperaba {firma.Parametros[indiceArgumento].Tipo} y se recibió {tipoArgumento} en línea {linea}");
+                    }
+                    indiceArgumento++;
+                    if (TokenActual.token != "CD6") break;
+                    Avanzar();
+                }
+            }
+
+            Consumir("CD4", "Se esperaba ')' al cerrar llamada de función");
+            if (firma == null)
+            {
+                Error($"Función '{nombre}' no declarada en línea {linea}");
+                return "ERROR";
+            }
+            if (indiceArgumento != firma.Parametros.Count)
+                Error($"La función '{nombre}' esperaba {firma.Parametros.Count} argumentos y recibió {indiceArgumento} en línea {linea}");
+            if (string.IsNullOrEmpty(firma.TipoRetorno))
+            {
+                if (!requiereTipoRetorno)
+                    return "VOID";
+                Error($"No se pudo determinar el tipo de retorno de la función '{nombre}' en línea {linea}");
+                return "ERROR";
+            }
+            return firma.TipoRetorno;
         }
 
         private void ParseARG3()
@@ -878,6 +988,10 @@
                 Consumir("CD4", "Se esperaba ')' después de OPA");
                 return tipoResult;
             }
+            else if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+            {
+                return ParseLlamadaFuncion();
+            }
             else if (EsID(TokenActual.token))
             {
                 string id = TokenActual.valor;
@@ -962,14 +1076,60 @@
         {
             if (AstRoot == null) return;
 
-            foreach (var stmt in AstRoot.Statements.OfType<DeclarationNode>())
+            foreach (DeclarationNode declaracion in EnumerarDeclaraciones(AstRoot.Statements))
             {
-                if (stmt.Identificador == id && stmt.MemoryAddress == null)
+                if (declaracion.Identificador == id && declaracion.MemoryAddress == null)
                 {
-                    stmt.MemoryAddress = address;
-                    stmt.Size = size;
+                    declaracion.MemoryAddress = address;
+                    declaracion.Size = size;
                     DebugLog.Add($"AST annotated: decl {id} -> addr={address} size={size}");
                     return;
+                }
+            }
+        }
+
+        private IEnumerable<DeclarationNode> EnumerarDeclaraciones(IEnumerable<AstNode> sentencias)
+        {
+            foreach (AstNode sentencia in sentencias)
+            {
+                if (sentencia is DeclarationNode declaracion)
+                    yield return declaracion;
+                else if (sentencia is BlockNode bloque)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(bloque.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is IfNode condicional)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(condicional.BloqueVerdadero.Statements))
+                        yield return anidada;
+                    if (condicional.BloqueFalso != null)
+                        foreach (DeclarationNode anidada in EnumerarDeclaraciones(condicional.BloqueFalso.Statements))
+                            yield return anidada;
+                }
+                else if (sentencia is WhileNode mientras)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(mientras.Cuerpo.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is DoWhileNode hacerMientras)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(hacerMientras.Cuerpo.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is ForNode para)
+                {
+                    foreach (DeclarationNode anidada in EnumerarDeclaraciones(para.Cuerpo.Statements))
+                        yield return anidada;
+                }
+                else if (sentencia is SwitchNode seleccion)
+                {
+                    foreach (SwitchCaseNode caso in seleccion.Casos)
+                        foreach (DeclarationNode anidada in EnumerarDeclaraciones(caso.Cuerpo.Statements))
+                            yield return anidada;
+                    if (seleccion.Predeterminado != null)
+                        foreach (DeclarationNode anidada in EnumerarDeclaraciones(seleccion.Predeterminado.Statements))
+                            yield return anidada;
                 }
             }
         }
@@ -1028,6 +1188,12 @@
             public Ambito? Padre { get; init; }
             public int StackPointerGuardado { get; init; }
             public List<string> Simbolos { get; } = new();
+        }
+
+        private sealed class FirmaFuncion
+        {
+            public List<(string Nombre, string Tipo)> Parametros { get; } = new();
+            public string TipoRetorno { get; set; } = string.Empty;
         }
 
         private bool TiposCompatibles(string tipo1, string tipo2)

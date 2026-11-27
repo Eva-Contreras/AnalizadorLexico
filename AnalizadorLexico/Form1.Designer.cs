@@ -97,6 +97,20 @@
             label3 = new Label();
             pictureBox3 = new PictureBox();
             tabPage4 = new TabPage();
+            tabPageOptimizacion = new TabPage();
+            tableLayoutOptimizacion = new TableLayoutPanel();
+            panelAccionesOptimizacion = new FlowLayoutPanel();
+            btnOptimizar = new Button();
+            groupCodigoTresDireccionesOpt = new GroupBox();
+            rtxCodigoTresDireccionesOpt = new RichTextBox();
+            groupCodigoPOpt = new GroupBox();
+            rtxCodigoPOpt = new RichTextBox();
+            groupNotacionPolacaOpt = new GroupBox();
+            rtxNotacionPolacaOpt = new RichTextBox();
+            groupNotacionPolacaInversaOpt = new GroupBox();
+            rtxNotacionPolacaInversaOpt = new RichTextBox();
+            groupInformeOptimizacion = new GroupBox();
+            rtxInformeOptimizacion = new RichTextBox();
             groupBox4 = new GroupBox();
             label7 = new Label();
             richTextBox6 = new RichTextBox();
@@ -544,6 +558,7 @@
             tabControl1.Controls.Add(tabPage2);
             tabControl1.Controls.Add(tabPage3);
             tabControl1.Controls.Add(tabPage4);
+            tabControl1.Controls.Add(tabPageOptimizacion);
             tabControl1.Location = new Point(13, 13);
             tabControl1.Margin = new Padding(4, 5, 4, 5);
             tabControl1.Name = "tabControl1";
@@ -833,9 +848,148 @@
             tabPage4.Size = new Size(1136, 915);
             tabPage4.TabIndex = 3;
             tabPage4.Text = "Código Intermedio";
-            // 
+            //
+            // tabPageOptimizacion
+            //
+            tabPageOptimizacion.BackColor = SystemColors.GradientActiveCaption;
+            tabPageOptimizacion.Controls.Add(tableLayoutOptimizacion);
+            tabPageOptimizacion.Location = new Point(4, 34);
+            tabPageOptimizacion.Name = "tabPageOptimizacion";
+            tabPageOptimizacion.Padding = new Padding(3);
+            tabPageOptimizacion.Size = new Size(1136, 915);
+            tabPageOptimizacion.TabIndex = 4;
+            tabPageOptimizacion.Text = "Optimización";
+            //
+            //
+            // tableLayoutOptimizacion
+            //
+            tableLayoutOptimizacion.ColumnCount = 2;
+            tableLayoutOptimizacion.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.RowCount = 4;
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Absolute, 48F));
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Percent, 50F));
+            tableLayoutOptimizacion.RowStyles.Add(new RowStyle(SizeType.Absolute, 120F));
+            tableLayoutOptimizacion.Controls.Add(panelAccionesOptimizacion, 0, 0);
+            tableLayoutOptimizacion.Controls.Add(groupCodigoTresDireccionesOpt, 0, 1);
+            tableLayoutOptimizacion.Controls.Add(groupCodigoPOpt, 1, 1);
+            tableLayoutOptimizacion.Controls.Add(groupNotacionPolacaOpt, 0, 2);
+            tableLayoutOptimizacion.Controls.Add(groupNotacionPolacaInversaOpt, 1, 2);
+            tableLayoutOptimizacion.Controls.Add(groupInformeOptimizacion, 0, 3);
+            tableLayoutOptimizacion.SetColumnSpan(groupInformeOptimizacion, 2);
+            tableLayoutOptimizacion.Dock = DockStyle.Fill;
+            tableLayoutOptimizacion.Name = "tableLayoutOptimizacion";
+            tableLayoutOptimizacion.Padding = new Padding(6);
+            tableLayoutOptimizacion.TabIndex = 0;
+            //
+            // panelAccionesOptimizacion
+            //
+            panelAccionesOptimizacion.Controls.Add(btnOptimizar);
+            panelAccionesOptimizacion.Dock = DockStyle.Fill;
+            panelAccionesOptimizacion.FlowDirection = FlowDirection.LeftToRight;
+            panelAccionesOptimizacion.Name = "panelAccionesOptimizacion";
+            panelAccionesOptimizacion.WrapContents = false;
+            //
+            //
+            // btnOptimizar
+            //
+            btnOptimizar.Enabled = false;
+            btnOptimizar.Margin = new Padding(3, 3, 12, 3);
+            btnOptimizar.Name = "btnOptimizar";
+            btnOptimizar.Size = new Size(130, 35);
+            btnOptimizar.TabIndex = 0;
+            btnOptimizar.Text = "Optimizar";
+            btnOptimizar.UseVisualStyleBackColor = true;
+            //
+            //
+            // groupCodigoTresDireccionesOpt
+            //
+            groupCodigoTresDireccionesOpt.Controls.Add(rtxCodigoTresDireccionesOpt);
+            groupCodigoTresDireccionesOpt.Dock = DockStyle.Fill;
+            groupCodigoTresDireccionesOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupCodigoTresDireccionesOpt.Name = "groupCodigoTresDireccionesOpt";
+            groupCodigoTresDireccionesOpt.Padding = new Padding(8);
+            groupCodigoTresDireccionesOpt.Text = "Cuádruplos optimizados";
+            //
+            // rtxCodigoTresDireccionesOpt
+            //
+            rtxCodigoTresDireccionesOpt.Dock = DockStyle.Fill;
+            rtxCodigoTresDireccionesOpt.Font = new Font("Consolas", 9F);
+            rtxCodigoTresDireccionesOpt.ReadOnly = true;
+            rtxCodigoTresDireccionesOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxCodigoTresDireccionesOpt.WordWrap = false;
+            //
+            // groupCodigoPOpt
+            //
+            groupCodigoPOpt.Controls.Add(rtxCodigoPOpt);
+            groupCodigoPOpt.Dock = DockStyle.Fill;
+            groupCodigoPOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupCodigoPOpt.Name = "groupCodigoPOpt";
+            groupCodigoPOpt.Padding = new Padding(8);
+            groupCodigoPOpt.Text = "Código P";
+            //
+            // rtxCodigoPOpt
+            //
+            rtxCodigoPOpt.Dock = DockStyle.Fill;
+            rtxCodigoPOpt.Font = new Font("Consolas", 9F);
+            rtxCodigoPOpt.ReadOnly = true;
+            rtxCodigoPOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxCodigoPOpt.WordWrap = false;
+            //
+            // groupNotacionPolacaOpt
+            //
+            groupNotacionPolacaOpt.Controls.Add(rtxNotacionPolacaOpt);
+            groupNotacionPolacaOpt.Dock = DockStyle.Fill;
+            groupNotacionPolacaOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupNotacionPolacaOpt.Name = "groupNotacionPolacaOpt";
+            groupNotacionPolacaOpt.Padding = new Padding(8);
+            groupNotacionPolacaOpt.Text = "Notación polaca";
+            //
+            // rtxNotacionPolacaOpt
+            //
+            rtxNotacionPolacaOpt.Dock = DockStyle.Fill;
+            rtxNotacionPolacaOpt.Font = new Font("Consolas", 9F);
+            rtxNotacionPolacaOpt.ReadOnly = true;
+            rtxNotacionPolacaOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxNotacionPolacaOpt.WordWrap = false;
+            //
+            // groupNotacionPolacaInversaOpt
+            //
+            groupNotacionPolacaInversaOpt.Controls.Add(rtxNotacionPolacaInversaOpt);
+            groupNotacionPolacaInversaOpt.Dock = DockStyle.Fill;
+            groupNotacionPolacaInversaOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupNotacionPolacaInversaOpt.Name = "groupNotacionPolacaInversaOpt";
+            groupNotacionPolacaInversaOpt.Padding = new Padding(8);
+            groupNotacionPolacaInversaOpt.Text = "Notación polaca inversa";
+            //
+            // rtxNotacionPolacaInversaOpt
+            //
+            rtxNotacionPolacaInversaOpt.Dock = DockStyle.Fill;
+            rtxNotacionPolacaInversaOpt.Font = new Font("Consolas", 9F);
+            rtxNotacionPolacaInversaOpt.ReadOnly = true;
+            rtxNotacionPolacaInversaOpt.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxNotacionPolacaInversaOpt.WordWrap = false;
+            //
+            // groupInformeOptimizacion
+            //
+            groupInformeOptimizacion.Controls.Add(rtxInformeOptimizacion);
+            groupInformeOptimizacion.Dock = DockStyle.Fill;
+            groupInformeOptimizacion.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            groupInformeOptimizacion.Name = "groupInformeOptimizacion";
+            groupInformeOptimizacion.Padding = new Padding(8);
+            groupInformeOptimizacion.Text = "Informe de optimización";
+            //
+            // rtxInformeOptimizacion
+            //
+            rtxInformeOptimizacion.Dock = DockStyle.Fill;
+            rtxInformeOptimizacion.Font = new Font("Consolas", 9F);
+            rtxInformeOptimizacion.ReadOnly = true;
+            rtxInformeOptimizacion.ScrollBars = RichTextBoxScrollBars.Both;
+            rtxInformeOptimizacion.WordWrap = true;
+            //
             // groupBox4
-            // 
+            //
             groupBox4.BackColor = SystemColors.GradientInactiveCaption;
             groupBox4.Controls.Add(label7);
             groupBox4.Controls.Add(richTextBox6);
@@ -1222,6 +1376,20 @@
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn9;
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn10;
         private TabPage tabPage4;
+        private TabPage tabPageOptimizacion;
+        private TableLayoutPanel tableLayoutOptimizacion;
+        private FlowLayoutPanel panelAccionesOptimizacion;
+        private Button btnOptimizar;
+        private GroupBox groupCodigoTresDireccionesOpt;
+        private RichTextBox rtxCodigoTresDireccionesOpt;
+        private GroupBox groupCodigoPOpt;
+        private RichTextBox rtxCodigoPOpt;
+        private GroupBox groupNotacionPolacaOpt;
+        private RichTextBox rtxNotacionPolacaOpt;
+        private GroupBox groupNotacionPolacaInversaOpt;
+        private RichTextBox rtxNotacionPolacaInversaOpt;
+        private GroupBox groupInformeOptimizacion;
+        private RichTextBox rtxInformeOptimizacion;
         private Label label6;
         private PictureBox pictureBox4;
         private GroupBox groupBox4;

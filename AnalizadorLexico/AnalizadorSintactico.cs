@@ -5,6 +5,7 @@
         private List<(int linea, string valor, string token)> _tokens = new();
         private int _pos;
         private int _ultimaLineaConsumida = 0;
+        private List<AstNode> _sentenciasActuales = new();
         public List<string> Pasos { get; private set; } = new();
         public List<string> Errores { get; private set; } = new();
         public bool EsValido => Errores.Count == 0;
@@ -18,6 +19,7 @@
             Pasos.Clear();
             Errores.Clear();
             AstRoot = new ProgramNode();
+            _sentenciasActuales = AstRoot.Statements;
 
             Pasos.Add("=== INICIO DEL ANÁLISIS SINTÁCTICO ===");
 
@@ -42,6 +44,7 @@
                 case "PR1": ParseLeer(); break;
                 case "PR2": ParseImprimir(); break;
                 case "PR3": ParseRetornar(); break;
+                case "PR14": ParseFuncion(); break;
                 case "PR4": ParseSentenciaIf(); break;
                 case "PR6": ParseCasos(); break;
                 case "PR9": ParseMientras(); break;
@@ -51,7 +54,12 @@
                 case "PR13": ParseUbicar(); break;
                 default:
                     if (EsID(TokenActual.token))
-                        ParseAsignacion();
+                    {
+                        if (_pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                            ParseLlamadaFuncion();
+                        else
+                            ParseAsignacion();
+                    }
                     else
                     {
                         Error($"Sentencia no reconocida '{TokenActual.valor}' ({TokenActual.token}) en línea {_ultimaLineaConsumida}");
@@ -61,34 +69,60 @@
             }
         }
 
+        private void ParseLlamadaFuncion()
+        {
+            int inicio = _pos;
+            ParseLlamadaFuncionExpresion();
+            CallNode? llamada = ConstruirExpresion(inicio, _pos) as CallNode;
+            Consumir("CD5", "Se esperaba ';' al final de la llamada de función");
+            if (llamada != null)
+                _sentenciasActuales.Add(llamada);
+        }
+
+        private void ParseFuncion()
+        {
+            Consumir("PR14", "Se esperaba 'FUNCION'");
+            string nombre = LeerIdentificador();
+            Consumir("CD3", "Se esperaba '(' después del nombre de la función");
+            FunctionNode funcion = new() { Nombre = nombre };
+
+            if (TokenActual.token != "CD4")
+            {
+                do
+                {
+                    string tipo = TokenActual.token;
+                    if (tipo != "ENT" && tipo != "DEC" && tipo != "CAD")
+                    {
+                        Error($"Se esperaba tipo de parámetro en función '{nombre}' en línea {TokenActual.linea}");
+                        return;
+                    }
+                    Avanzar();
+                    string id = LeerIdentificador();
+                    funcion.Parametros.Add(new FunctionParameterNode { Tipo = tipo, Nombre = id });
+                    if (TokenActual.token != "CD6") break;
+                    Avanzar();
+                } while (TokenActual.token != "CD4" && TokenActual.token != "EOF");
+            }
+
+            Consumir("CD4", "Se esperaba ')' después de los parámetros");
+            Consumir("CD1", "Se esperaba '{' al iniciar el cuerpo de la función");
+            funcion.Cuerpo = ParseBloque();
+            Consumir("CD2", "Se esperaba '}' al cerrar el cuerpo de la función");
+            _sentenciasActuales.Add(funcion);
+        }
+
         private void ParseDeclaracionENT()
         {
             Pasos.Add("[ENT] Declaración entera...");
             Consumir("ENT", "Se esperaba 'ENT'");
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-            {
-                ParseARG2();
-            }
-            else
-            {
-
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
+            int inicioExpresion = _pos;
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
             var decl = new DeclarationNode { Tipo = "ENT", Identificador = id, Valor = valorNode };
-            AstRoot.Statements.Add(decl);
+            _sentenciasActuales.Add(decl);
             Pasos.Add("[ENT] Declaración reconocida ✔");
         }
 
@@ -98,25 +132,12 @@
             Consumir("DEC", "Se esperaba 'DEC'");
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-                ParseARG2();
-            else
-            {
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
+            int inicioExpresion = _pos;
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
             var decl = new DeclarationNode { Tipo = "DEC", Identificador = id, Valor = valorNode };
-            AstRoot.Statements.Add(decl);
+            _sentenciasActuales.Add(decl);
             Pasos.Add("[DEC] Declaración reconocida ✔");
         }
 
@@ -126,52 +147,33 @@
             Consumir("CAD", "Se esperaba 'CAD'");
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-                ParseARG2();
-            else
-            {
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
+            int inicioExpresion = _pos;
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
             var decl = new DeclarationNode { Tipo = "CAD", Identificador = id, Valor = valorNode };
-            AstRoot.Statements.Add(decl);
+            _sentenciasActuales.Add(decl);
             Pasos.Add("[CAD] Declaración reconocida ✔");
         }
- 
+
         private void ParseAsignacion()
         {
             Pasos.Add($"[ASIG] Asignación a '{TokenActual.valor}'...");
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' en asignación");
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-                ParseARG2();
+            int inicioExpresion = _pos;
+
+            // ¡ESTA ES LA MAGIA! 
+            // Si el siguiente token es un número o un ID, obligamos a que evalúe la operación completa
+            if (EsID(TokenActual.token) || EsCN(TokenActual.token) || TokenActual.token == "CD3")
+                ParseOPA();
             else
-            {
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
+                ParseARG2();
+
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de asignación");
             var assign = new AssignmentNode { Identificador = id, Valor = valorNode };
-            AstRoot.Statements.Add(assign);
+            _sentenciasActuales.Add(assign);
             Pasos.Add("[ASIG] Asignación reconocida ✔");
         }
 
@@ -180,9 +182,11 @@
             Pasos.Add("[PR1] leer...");
             Consumir("PR1", "Se esperaba 'leer' (PR1)");
             Consumir("CD3", "Se esperaba '(' después de 'leer'");
+            string identificador = TokenActual.valor;
             ParseARG1();
             Consumir("CD4", "Se esperaba ')' en 'leer'");
             Consumir("CD5", "Se esperaba ';' al final de 'leer'");
+            _sentenciasActuales.Add(new ReadNode { Identificador = identificador });
             Pasos.Add("[PR1] leer reconocido ✔");
         }
 
@@ -191,9 +195,12 @@
             Pasos.Add("[PR2] imprimir...");
             Consumir("PR2", "Se esperaba 'imprimir' (PR2)");
             Consumir("CD3", "Se esperaba '(' después de 'imprimir'");
+            int inicioValor = _pos;
             ParseARG2();
+            AstNode? valor = ConstruirExpresion(inicioValor, _pos);
             Consumir("CD4", "Se esperaba ')' en 'imprimir'");
             Consumir("CD5", "Se esperaba ';' al final de 'imprimir'");
+            _sentenciasActuales.Add(new PrintNode { Valor = valor });
             Pasos.Add("[PR2] imprimir reconocido ✔");
         }
 
@@ -201,8 +208,11 @@
         {
             Pasos.Add("[PR3] retornar...");
             Consumir("PR3", "Se esperaba 'retornar' (PR3)");
+            int inicioValor = _pos;
             ParseARG2();
+            AstNode? valor = ConstruirExpresion(inicioValor, _pos);
             Consumir("CD5", "Se esperaba ';' al final de 'retornar'");
+            _sentenciasActuales.Add(new ReturnNode { Valor = valor });
             Pasos.Add("[PR3] retornar reconocido ✔");
         }
 
@@ -211,20 +221,29 @@
             Pasos.Add("[SI] Analizando sentencia SI...");
             Consumir("PR4", "Se esperaba 'si' (PR4)");
             Consumir("CD3", "Se esperaba '(' después de 'si'");
+            int inicioCondicion = _pos;
             ParseCondic();
+            ExpressionNode? condicion = ConstruirCondicion(inicioCondicion, _pos);
             Consumir("CD4", "Se esperaba ')' después de la condición");
             Consumir("CD1", "Se esperaba '{' para abrir bloque SI");
-            ParseBloque();
+            BlockNode bloqueVerdadero = ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque SI");
+            BlockNode? bloqueFalso = null;
 
             if (TokenActual.token == "PR5")
             {
                 Pasos.Add("[SINO] Analizando bloque SINO...");
                 Consumir("PR5", "Se esperaba 'sino' (PR5)");
                 Consumir("CD1", "Se esperaba '{' para abrir bloque SINO");
-                ParseBloque();
+                bloqueFalso = ParseBloque();
                 Consumir("CD2", "Se esperaba '}' para cerrar bloque SINO");
             }
+            _sentenciasActuales.Add(new IfNode
+            {
+                Condicion = condicion,
+                BloqueVerdadero = bloqueVerdadero,
+                BloqueFalso = bloqueFalso
+            });
             Pasos.Add("[SI] Sentencia SI/SINO reconocida ✔");
         }
 
@@ -233,42 +252,57 @@
             Pasos.Add("[PR6] casos...");
             Consumir("PR6", "Se esperaba 'casos' (PR6)");
             Consumir("CD3", "Se esperaba '(' después de 'casos'");
+            string selector = TokenActual.valor;
             ParseARG1();
             Consumir("CD4", "Se esperaba ')' en 'casos'");
             Consumir("CD1", "Se esperaba '{' para abrir CASOS");
-            ParseOpciones();
-            ParsePred();
+            SwitchNode seleccion = new() { Selector = selector };
+            ParseOpciones(seleccion);
+            ParsePred(seleccion);
             Consumir("CD2", "Se esperaba '}' para cerrar CASOS");
+            _sentenciasActuales.Add(seleccion);
             Pasos.Add("[PR6] casos reconocido ✔");
         }
 
-        private void ParseOpciones()
+        private void ParseOpciones(SwitchNode seleccion)
         {
-            ParseOpcion();
+            ParseOpcion(seleccion);
             while (TokenActual.token == "PR7")
-                ParseOpcion();
+                ParseOpcion(seleccion);
         }
 
-        private void ParseOpcion()
+        private void ParseOpcion(SwitchNode seleccion)
         {
             Pasos.Add("[PR7] opcion...");
             Consumir("PR7", "Se esperaba 'opcion' (PR7)");
+            int inicioValor = _pos;
             ParseARG3();
+            AstNode? valor = ConstruirExpresion(inicioValor, _pos);
             Consumir("CD9", "Se esperaba ':' después de ARG3 en opcion");
+            BlockNode cuerpo = new();
+            List<AstNode> anterior = _sentenciasActuales;
+            _sentenciasActuales = cuerpo.Statements;
             ParseS();
-            Consumir("CD11", "Se esperaba 'terminar' al final de opcion");
+            _sentenciasActuales = anterior;
+            Consumir("CD10", "Se esperaba 'terminar' al final de opcion");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
+            seleccion.Casos.Add(new SwitchCaseNode { Valor = valor as ExpressionNode, Cuerpo = cuerpo });
             Pasos.Add("[PR7] opcion reconocida ✔");
         }
 
-        private void ParsePred()
+        private void ParsePred(SwitchNode seleccion)
         {
             Pasos.Add("[PR8] predefinido...");
             Consumir("PR8", "Se esperaba 'predefinido' (PR8)");
             Consumir("CD9", "Se esperaba ':' después de 'predefinido'");
+            BlockNode cuerpo = new();
+            List<AstNode> anterior = _sentenciasActuales;
+            _sentenciasActuales = cuerpo.Statements;
             ParseS();
-            Consumir("CD11", "Se esperaba 'terminar' al final de predefinido");
+            _sentenciasActuales = anterior;
+            Consumir("CD10", "Se esperaba 'terminar' al final de predefinido");
             Consumir("CD5", "Se esperaba ';' después de 'terminar'");
+            seleccion.Predeterminado = cuerpo;
             Pasos.Add("[PR8] predefinido reconocido ✔");
         }
 
@@ -277,11 +311,14 @@
             Pasos.Add("[PR9] mientras...");
             Consumir("PR9", "Se esperaba 'mientras' (PR9)");
             Consumir("CD3", "Se esperaba '(' después de 'mientras'");
+            int inicioCondicion = _pos;
             ParseCondic();
+            ExpressionNode? condicion = ConstruirCondicion(inicioCondicion, _pos);
             Consumir("CD4", "Se esperaba ')' después de la condición en 'mientras'");
             Consumir("CD1", "Se esperaba '{' para abrir bloque 'mientras'");
-            ParseBloque();
+            BlockNode cuerpo = ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque 'mientras'");
+            _sentenciasActuales.Add(new WhileNode { Condicion = condicion, Cuerpo = cuerpo });
             Pasos.Add("[PR9] mientras reconocido ✔");
         }
 
@@ -290,13 +327,16 @@
             Pasos.Add("[PR10] hacer...");
             Consumir("PR10", "Se esperaba 'hacer' (PR10)");
             Consumir("CD1", "Se esperaba '{' para abrir bloque 'hacer'");
-            ParseBloque();
+            BlockNode cuerpo = ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque 'hacer'");
             Consumir("PR9", "Se esperaba 'mientras' después del bloque 'hacer'");
             Consumir("CD3", "Se esperaba '(' después de 'mientras' en 'hacer'");
+            int inicioCondicion = _pos;
             ParseCondic();
+            ExpressionNode? condicion = ConstruirCondicion(inicioCondicion, _pos);
             Consumir("CD4", "Se esperaba ')' después de la condición en 'hacer'");
             Consumir("CD5", "Se esperaba ';' al final de 'hacer-mientras'");
+            _sentenciasActuales.Add(new DoWhileNode { Condicion = condicion, Cuerpo = cuerpo });
             Pasos.Add("[PR10] hacer reconocido ✔");
         }
 
@@ -306,23 +346,41 @@
             Consumir("PR11", "Se esperaba 'para' (PR11)");
             Consumir("CD3", "Se esperaba '(' después de 'para'");
             Consumir("ENT", "Se esperaba 'ENT' en inicialización de 'para'");
+            string idInicial = TokenActual.valor;
             ParseARG1();
             Consumir("OPA", "Se esperaba '=' en inicialización de 'para'");
+            string valorInicial = TokenActual.valor;
             if (TokenActual.token == "CNU")
                 Avanzar();
             else
                 Error($"Se esperaba constante entera (CNU) en 'para', se encontró '{TokenActual.valor}'");
             Consumir("CD5", "Se esperaba ';' después de inicialización en 'para'");
+            AssignmentNode inicializacion = new()
+            {
+                Identificador = idInicial,
+                Valor = new LiteralNode { TipoLiteral = "CNU", Valor = valorInicial }
+            };
+            int inicioCondicion = _pos;
             ParseCondic();
+            ExpressionNode? condicion = ConstruirCondicion(inicioCondicion, _pos);
             Consumir("CD5", "Se esperaba ';' después de condición en 'para'");
-            
+            string idIncremento = TokenActual.valor;
             ParseARG1();
             Consumir("OPA", "Se esperaba '=' en incremento de 'para'");
+            int inicioIncremento = _pos;
             ParseARG2();
+            AstNode? valorIncremento = ConstruirExpresion(inicioIncremento, _pos);
             Consumir("CD4", "Se esperaba ')' para cerrar cabecera de 'para'");
             Consumir("CD1", "Se esperaba '{' para abrir bloque 'para'");
-            ParseBloque();
+            BlockNode cuerpo = ParseBloque();
             Consumir("CD2", "Se esperaba '}' para cerrar bloque 'para'");
+            _sentenciasActuales.Add(new ForNode
+            {
+                Inicializacion = inicializacion,
+                Condicion = condicion,
+                Incremento = new AssignmentNode { Identificador = idIncremento, Valor = valorIncremento },
+                Cuerpo = cuerpo
+            });
             Pasos.Add("[PR11] para reconocido ✔");
         }
 
@@ -331,6 +389,7 @@
             Pasos.Add("[PR12] limpiar...");
             Consumir("PR12", "Se esperaba 'limpiar' (PR12)");
             Consumir("CD5", "Se esperaba ';' después de 'limpiar'");
+            _sentenciasActuales.Add(new SimpleInstructionNode { Operacion = "CLEAR" });
             Pasos.Add("[PR12] limpiar reconocido ✔");
         }
 
@@ -339,11 +398,17 @@
             Pasos.Add("[PR13] ubicar...");
             Consumir("PR13", "Se esperaba 'ubicar' (PR13)");
             Consumir("CD3", "Se esperaba '(' en ARG5");
+            string argumento1 = TokenActual.valor;
             ParseARG6();
             Consumir("CD6", "Se esperaba ',' entre argumentos de 'ubicar'");
+            string argumento2 = TokenActual.valor;
             ParseARG6();
             Consumir("CD4", "Se esperaba ')' para cerrar ARG5");
             Consumir("CD5", "Se esperaba ';' al final de 'ubicar'");
+            var instruccion = new SimpleInstructionNode { Operacion = "LOCATE" };
+            instruccion.Argumentos.Add(argumento1);
+            instruccion.Argumentos.Add(argumento2);
+            _sentenciasActuales.Add(instruccion);
             Pasos.Add("[PR13] ubicar reconocido ✔");
         }
 
@@ -357,19 +422,26 @@
                 Error($"Se esperaba identificador o constante entera en ARG6, se encontró '{TokenActual.valor}'");
         }
 
-        private void ParseBloque()
+        private BlockNode ParseBloque()
         {
             Pasos.Add("[BLOQUE] Analizando cuerpo del bloque...");
+            BlockNode bloque = new();
+            List<AstNode> sentenciasAnteriores = _sentenciasActuales;
+            _sentenciasActuales = bloque.Statements;
 
             if (TokenActual.token == "CD2" || TokenActual.token == "EOF")
             {
                 Error($"Bloque vacío en línea {_ultimaLineaConsumida}, se esperaba al menos una sentencia");
-                return;
+                _sentenciasActuales = sentenciasAnteriores;
+                return bloque;
             }
 
             while (TokenActual.token != "CD2"
                 && TokenActual.token != "EOF")
                 ParseS();
+
+            _sentenciasActuales = sentenciasAnteriores;
+            return bloque;
         }
 
         private void ParseCondic()
@@ -437,6 +509,11 @@
             }
             else if (EsID(TokenActual.token) || EsCN(TokenActual.token))
             {
+                if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                {
+                    ParseLlamadaFuncionExpresion();
+                    return;
+                }
                 int posTemp = _pos + 1;
                 bool esOpa = posTemp < _tokens.Count && EsOA(_tokens[posTemp].token);
                 if (esOpa) ParseOPA();
@@ -451,9 +528,15 @@
         {
             Pasos.Add($"[ARG2] token: {TokenActual.token} '{TokenActual.valor}'");
 
+            if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+            {
+                ParseLlamadaFuncionExpresion();
+                ParseOPARest();
+                return;
+            }
+
             if (EsCadeLiteral(TokenActual.token))
             {
-                
                 int posTemp = _pos + 1;
                 if (posTemp < _tokens.Count && EsOA(_tokens[posTemp].token))
                     ParseOPA();
@@ -465,16 +548,40 @@
             }
             else if (EsID(TokenActual.token) || EsCN(TokenActual.token))
             {
+                // Verificamos si hay un operador matemático después (como +, -, *, /)
                 int posTemp = _pos + 1;
                 bool esOpa = posTemp < _tokens.Count && EsOA(_tokens[posTemp].token);
-                if (esOpa) ParseOPA();
-                else if (EsID(TokenActual.token)) ParseID();
-                else ParseCN();
+
+                if (esOpa)
+                    ParseOPA(); // Si hay operador, procesa toda la suma/resta
+                else if (EsID(TokenActual.token))
+                    ParseID();
+                else
+                    ParseCN();
             }
             else if (TokenActual.token == "CD3")
                 ParseOPA();
             else
                 Error($"Se esperaba argumento válido en ARG2, se encontró '{TokenActual.valor}'");
+        }
+
+        private void ParseLlamadaFuncionExpresion()
+        {
+            Avanzar();
+            Consumir("CD3", "Se esperaba '(' en llamada de función");
+            if (TokenActual.token == "CD4")
+            {
+                Avanzar();
+                return;
+            }
+
+            ParseARG2();
+            while (TokenActual.token == "CD6")
+            {
+                Avanzar();
+                ParseARG2();
+            }
+            Consumir("CD4", "Se esperaba ')' al cerrar llamada de función");
         }
 
         private void ParseARG3()
@@ -541,6 +648,8 @@
             }
             if (EsID(TokenActual.token))
             {
+                if (_pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                    return null;
                 var node = new IdentifierNode { Nombre = TokenActual.valor };
                 Avanzar();
                 return node;
@@ -549,6 +658,250 @@
                 return null;
 
             return null;
+        }
+
+        private AstNode? ConstruirExpresion(int inicio, int fin)
+        {
+            if (inicio >= fin || inicio < 0 || fin > _tokens.Count)
+            {
+                Error($"Expresión vacía o inválida en línea {_ultimaLineaConsumida}");
+                return null;
+            }
+
+            List<(int linea, string valor, string token)> tokens = _tokens.Skip(inicio).Take(fin - inicio).ToList();
+            int indice = 0;
+            ExpressionNode? expresion = ParseExpresionSuma(tokens, ref indice);
+            if (expresion == null || indice != tokens.Count)
+            {
+                Error($"No se pudo construir la expresión del AST en línea {tokens[0].linea}");
+                return null;
+            }
+
+            return expresion;
+        }
+
+        private ExpressionNode? ParseExpresionSuma(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            ExpressionNode? izquierda = ParseExpresionProducto(tokens, ref indice);
+            while (izquierda != null && indice < tokens.Count && EsOperadorAditivo(tokens[indice]))
+            {
+                string operador = tokens[indice++].valor;
+                ExpressionNode? derecha = ParseExpresionProducto(tokens, ref indice);
+                if (derecha == null) return null;
+                izquierda = CrearOperacion(operador, izquierda, derecha);
+            }
+            return izquierda;
+        }
+
+        private ExpressionNode? ParseExpresionProducto(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            ExpressionNode? izquierda = ParseExpresionUnaria(tokens, ref indice);
+            while (izquierda != null && indice < tokens.Count && EsOperadorMultiplicativo(tokens[indice]))
+            {
+                string operador = tokens[indice++].valor;
+                ExpressionNode? derecha = ParseExpresionUnaria(tokens, ref indice);
+                if (derecha == null) return null;
+                izquierda = CrearOperacion(operador, izquierda, derecha);
+            }
+            return izquierda;
+        }
+
+        private ExpressionNode? ParseExpresionUnaria(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            if (indice < tokens.Count && (tokens[indice].valor == "+" || tokens[indice].valor == "-"))
+            {
+                string operador = tokens[indice++].valor;
+                ExpressionNode? operando = ParseExpresionUnaria(tokens, ref indice);
+                return operando == null ? null : new UnaryExpressionNode { Operador = operador, Operando = operando };
+            }
+
+            return ParsePotencia(tokens, ref indice);
+        }
+
+        private ExpressionNode? ParsePotencia(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            ExpressionNode? izquierda = ParseFactor(tokens, ref indice);
+            if (izquierda != null && indice < tokens.Count && tokens[indice].valor == "^")
+            {
+                indice++;
+                ExpressionNode? derecha = ParseExpresionUnaria(tokens, ref indice);
+                if (derecha == null) return null;
+                izquierda = CrearOperacion("^", izquierda, derecha);
+            }
+            return izquierda;
+        }
+
+        private ExpressionNode? ParseFactor(
+            List<(int linea, string valor, string token)> tokens,
+            ref int indice)
+        {
+            if (indice >= tokens.Count) return null;
+
+            string valor = tokens[indice].valor;
+            string token = tokens[indice].token;
+            if (token == "CD3")
+            {
+                indice++;
+                ExpressionNode? agrupada = ParseExpresionSuma(tokens, ref indice);
+                if (agrupada == null || indice >= tokens.Count || tokens[indice].token != "CD4") return null;
+                indice++;
+                return agrupada;
+            }
+
+            if (token.StartsWith("IDV", StringComparison.Ordinal))
+            {
+                indice++;
+                if (indice < tokens.Count && tokens[indice].token == "CD3")
+                {
+                    indice++;
+                    CallNode llamada = new() { NombreFuncion = valor };
+                    if (indice < tokens.Count && tokens[indice].token != "CD4")
+                    {
+                        while (true)
+                        {
+                            ExpressionNode? argumento = ParseExpresionSuma(tokens, ref indice);
+                            if (argumento == null) return null;
+                            llamada.Argumentos.Add(argumento);
+                            if (indice >= tokens.Count || tokens[indice].token != "CD6") break;
+                            indice++;
+                        }
+                    }
+                    if (indice >= tokens.Count || tokens[indice].token != "CD4") return null;
+                    indice++;
+                    return llamada;
+                }
+                return new IdentifierNode { Nombre = valor };
+            }
+            if (token == "CAD" || token == "CNU" || token == "CNR")
+            {
+                indice++;
+                return new LiteralNode { TipoLiteral = token, Valor = valor };
+            }
+            return null;
+        }
+
+        private static bool EsOperadorAditivo((int linea, string valor, string token) token)
+        {
+            return token.valor == "+" || token.valor == "-";
+        }
+
+        private static bool EsOperadorMultiplicativo((int linea, string valor, string token) token)
+        {
+            return token.valor == "*" || token.valor == "/" || token.valor == "%";
+        }
+
+        private ExpressionNode? ConstruirCondicion(int inicio, int fin)
+        {
+            if (inicio >= fin || inicio < 0 || fin > _tokens.Count) return null;
+
+            List<(int linea, string valor, string token)> tokens = _tokens.Skip(inicio).Take(fin - inicio).ToList();
+            ExpressionNode? condicion = ParseCondicion(tokens);
+            if (condicion == null)
+                Error($"No se pudo construir la condición del AST en línea {tokens[0].linea}");
+            return condicion;
+        }
+
+        private ExpressionNode? ParseCondicion(List<(int linea, string valor, string token)> tokens)
+        {
+            if (tokens.Count == 0) return null;
+
+            if (EstaEnmarcadaPorParentesis(tokens))
+                return ParseCondicion(tokens.Skip(1).Take(tokens.Count - 2).ToList());
+
+            int operador = BuscarOperadorLogico(tokens, "OL3");
+            if (operador >= 0)
+            {
+                ExpressionNode? izquierda = ParseCondicion(tokens.Take(operador).ToList());
+                ExpressionNode? derecha = ParseCondicion(tokens.Skip(operador + 1).ToList());
+                return izquierda == null || derecha == null ? null : CrearOperacion("O", izquierda, derecha);
+            }
+
+            operador = BuscarOperadorLogico(tokens, "OL1");
+            if (operador >= 0)
+            {
+                ExpressionNode? izquierda = ParseCondicion(tokens.Take(operador).ToList());
+                ExpressionNode? derecha = ParseCondicion(tokens.Skip(operador + 1).ToList());
+                return izquierda == null || derecha == null ? null : CrearOperacion("Y", izquierda, derecha);
+            }
+
+            if (tokens[0].token == "OL2")
+            {
+                ExpressionNode? operando = ParseCondicion(tokens.Skip(1).ToList());
+                return operando == null ? null : new UnaryExpressionNode { Operador = "NO", Operando = operando };
+            }
+
+            operador = BuscarOperadorRelacional(tokens);
+            if (operador >= 0)
+            {
+                ExpressionNode? izquierda = ParseExpresionCompleta(tokens.Take(operador).ToList());
+                ExpressionNode? derecha = ParseExpresionCompleta(tokens.Skip(operador + 1).ToList());
+                return izquierda == null || derecha == null
+                    ? null
+                    : CrearOperacion(tokens[operador].valor, izquierda, derecha);
+            }
+
+            return ParseExpresionCompleta(tokens);
+        }
+
+        private ExpressionNode? ParseExpresionCompleta(List<(int linea, string valor, string token)> tokens)
+        {
+            int indice = 0;
+            ExpressionNode? expresion = ParseExpresionSuma(tokens, ref indice);
+            return expresion != null && indice == tokens.Count ? expresion : null;
+        }
+
+        private static bool EstaEnmarcadaPorParentesis(List<(int linea, string valor, string token)> tokens)
+        {
+            if (tokens.Count < 2 || tokens[0].token != "CD3" || tokens[^1].token != "CD4") return false;
+            int nivel = 0;
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].token == "CD3") nivel++;
+                else if (tokens[i].token == "CD4" && --nivel == 0) return i == tokens.Count - 1;
+            }
+            return false;
+        }
+
+        private static int BuscarOperadorLogico(
+            List<(int linea, string valor, string token)> tokens,
+            string operador)
+        {
+            int nivel = 0;
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].token == "CD3") nivel++;
+                else if (tokens[i].token == "CD4") nivel--;
+                else if (nivel == 0 && tokens[i].token == operador) return i;
+            }
+            return -1;
+        }
+
+        private int BuscarOperadorRelacional(List<(int linea, string valor, string token)> tokens)
+        {
+            int nivel = 0;
+            for (int i = 0; i < tokens.Count; i++)
+            {
+                if (tokens[i].token == "CD3") nivel++;
+                else if (tokens[i].token == "CD4") nivel--;
+                else if (nivel == 0 && EsOR(tokens[i].token)) return i;
+            }
+            return -1;
+        }
+
+        private static BinaryExpressionNode CrearOperacion(
+            string operador,
+            ExpressionNode izquierda,
+            ExpressionNode derecha)
+        {
+            return new BinaryExpressionNode { Operador = operador, Izquierda = izquierda, Derecha = derecha };
         }
 
         private void ParseOPA()
@@ -648,6 +1001,8 @@
                 ParseOPA();
                 Consumir("CD4", "Se esperaba ')' después de OPA");
             }
+            else if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                ParseLlamadaFuncionExpresion();
             else if (EsID(TokenActual.token))
                 ParseID();
             else if (EsCN(TokenActual.token))

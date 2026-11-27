@@ -2,11 +2,11 @@
 
 namespace AnalizadorLexico
 {
-    public class Recorrido
+    public class AnalizadorLexico
     {
         // Cadena de conexión
-       // protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
-        protected string connectionString = "Server=Anapaula;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        //protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=tcp:Anapaula,1433;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
@@ -68,6 +68,8 @@ namespace AnalizadorLexico
         {"limpiar", "PR12"},
         {"UBICAR", "PR13"},
         {"ubicar", "PR13"},
+        {"FUNCION", "PR14"},
+        {"funcion", "PR14"},
         {"Y", "OL1"},
         {"NO", "OL2"},
         {"O", "OL3"},
@@ -122,7 +124,7 @@ namespace AnalizadorLexico
                                 else if (int.TryParse(fdcVal, out int estadoDestino))
                                 {
                                     _estadosFinalCadena.Add(estado);
-                                    _tabla[(estado, "FDC")] = estadoDestino; 
+                                    _tabla[(estado, "FDC")] = estadoDestino;
                                 }
                             }
                             continue;
@@ -178,6 +180,15 @@ namespace AnalizadorLexico
 
                 recorrido += $" ⊣ (FDC) -> Token: {tokenReservado}";
                 return (true, tokenReservado, recorrido);
+            }
+
+            bool esTipoDeclaracion = string.Equals(cadena, "ENT", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(cadena, "DEC", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(cadena, "CAD", StringComparison.OrdinalIgnoreCase);
+            if (!esTipoDeclaracion && cadena.Length > 0 && char.IsLetter(cadena[0]) &&
+                cadena.Skip(1).All(char.IsLetterOrDigit))
+            {
+                return (true, "IDV", $"(0) {cadena} -> IDV");
             }
 
             // If the token is a numeric literal (integer or real) we return it directly
@@ -290,15 +301,15 @@ namespace AnalizadorLexico
                 return char.ToUpper(c).ToString();
 
             if (char.IsDigit(c))
-              //return "_" + c.ToString();
-            return c.ToString();
+                //return "_" + c.ToString();
+                return c.ToString();
 
             if (simbolos.TryGetValue(c, out string? columna))
                 return columna;
 
             return null;
         }
-        public (List<(int linea, string valor, string token)> tokens,List<(int linea, string valor, string error)> errores, LinkedList<(int id, string nombre)> simbolos) AnalizarPrograma(string textoCompleto)
+        public (List<(int linea, string valor, string token)> tokens, List<(int linea, string valor, string error)> errores, LinkedList<(int id, string nombre)> simbolos) AnalizarPrograma(string textoCompleto)
         {
             CargarTabla();
             var tokens = new List<(int, string, string)>();
@@ -487,7 +498,7 @@ namespace AnalizadorLexico
         private bool EsDelimitadorOOperador(char c)
         {
             return c == '=' || c == ';' || c == ',' || c == '(' || c == ')' ||
-                   c == '{' || c == '}' || c == ':' || c == '<' || c == '>' ;
+                   c == '{' || c == '}' || c == ':' || c == '<' || c == '>';
         }
         private bool EsCaracterEspecial(char c)
         {
@@ -502,7 +513,7 @@ namespace AnalizadorLexico
             if (tieneSigno)
             {
                 numero += linea[i];
-                i++; 
+                i++;
             }
 
             bool tienePunto = false;
