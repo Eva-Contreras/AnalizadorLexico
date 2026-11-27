@@ -98,15 +98,9 @@
             pictureBox3 = new PictureBox();
             tabPage4 = new TabPage();
             tabPageOptimizacion = new TabPage();
-            tabControlOptimizacion = new TabControl();
-            tabPageTiposOptimizacion = new TabPage();
-            tabPageResultadoOptimizacion = new TabPage();
             tableLayoutOptimizacion = new TableLayoutPanel();
             panelAccionesOptimizacion = new FlowLayoutPanel();
-            lblTipoOptimizacion = new Label();
-            cmbTipoOptimizacion = new ComboBox();
             btnOptimizar = new Button();
-            lblCostoEstimado = new Label();
             groupCodigoTresDireccionesOpt = new GroupBox();
             rtxCodigoTresDireccionesOpt = new RichTextBox();
             groupCodigoPOpt = new GroupBox();
@@ -117,7 +111,6 @@
             rtxNotacionPolacaInversaOpt = new RichTextBox();
             groupInformeOptimizacion = new GroupBox();
             rtxInformeOptimizacion = new RichTextBox();
-            richTextBoxTiposOptimizacion = new RichTextBox();
             groupBox4 = new GroupBox();
             label7 = new Label();
             richTextBox6 = new RichTextBox();
@@ -859,7 +852,7 @@
             // tabPageOptimizacion
             //
             tabPageOptimizacion.BackColor = SystemColors.GradientActiveCaption;
-            tabPageOptimizacion.Controls.Add(tabControlOptimizacion);
+            tabPageOptimizacion.Controls.Add(tableLayoutOptimizacion);
             tabPageOptimizacion.Location = new Point(4, 34);
             tabPageOptimizacion.Name = "tabPageOptimizacion";
             tabPageOptimizacion.Padding = new Padding(3);
@@ -867,49 +860,6 @@
             tabPageOptimizacion.TabIndex = 4;
             tabPageOptimizacion.Text = "Optimización";
             //
-            // tabControlOptimizacion
-            //
-            tabControlOptimizacion.Controls.Add(tabPageTiposOptimizacion);
-            tabControlOptimizacion.Controls.Add(tabPageResultadoOptimizacion);
-            tabControlOptimizacion.Dock = DockStyle.Fill;
-            tabControlOptimizacion.Location = new Point(3, 3);
-            tabControlOptimizacion.Name = "tabControlOptimizacion";
-            tabControlOptimizacion.SelectedIndex = 0;
-            tabControlOptimizacion.Size = new Size(1130, 909);
-            tabControlOptimizacion.TabIndex = 0;
-            //
-            // tabPageTiposOptimizacion
-            //
-            tabPageTiposOptimizacion.BackColor = SystemColors.GradientActiveCaption;
-            tabPageTiposOptimizacion.Controls.Add(richTextBoxTiposOptimizacion);
-            tabPageTiposOptimizacion.Location = new Point(4, 34);
-            tabPageTiposOptimizacion.Name = "tabPageTiposOptimizacion";
-            tabPageTiposOptimizacion.Padding = new Padding(8);
-            tabPageTiposOptimizacion.Size = new Size(1122, 871);
-            tabPageTiposOptimizacion.TabIndex = 0;
-            tabPageTiposOptimizacion.Text = "Tipos y costos";
-            //
-            // richTextBoxTiposOptimizacion
-            //
-            richTextBoxTiposOptimizacion.BackColor = SystemColors.Window;
-            richTextBoxTiposOptimizacion.Dock = DockStyle.Fill;
-            richTextBoxTiposOptimizacion.Font = new Font("Segoe UI", 11F);
-            richTextBoxTiposOptimizacion.ReadOnly = true;
-            richTextBoxTiposOptimizacion.Text = "OPTIMIZACIÓN DEL CÓDIGO INTERMEDIO\n\n3.1 Tipos de optimización\n\n3.1.1 Locales\nSe aplican dentro de un bloque básico, sin cruzar saltos. Ejemplos: plegado de constantes, propagación de copias e identidades algebraicas.\n\n3.1.2 De ciclos\nActúan sobre bucles. Pueden mover expresiones invariantes fuera del ciclo y simplificar operaciones repetidas, siempre que se conserve el comportamiento del programa.\n\n3.1.3 Globales\nUsan información de varios bloques de control. Ejemplos: propagación de constantes o copias, eliminación de código muerto y eliminación de expresiones comunes cuando sus operandos no cambian.\n\n3.1.4 De mirilla\nRevisan ventanas pequeñas de instrucciones consecutivas para simplificar operaciones, quitar saltos redundantes o descartar instrucciones inalcanzables.\n\n3.2 Costos\n\n3.2.1 Costo de ejecución\nSe consideran operaciones ejecutadas y recursos como memoria, registros y pila. Las cifras de esta aplicación son estimaciones estructurales del IR; no equivalen a medir tiempo ni recursos de una máquina real.\n\n3.2.2 Criterios para mejorar el código\nUna transformación debe preservar el resultado observable, mantener válidos los saltos y reducir un costo definido. Se comparan instrucciones y temporales; el costo real depende del procesador y del código objeto que se genere.\n\n3.2.3 Herramientas para el análisis del flujo de datos\nEl grafo de flujo de control y los conjuntos de uso/definición permiten calcular variables vivas, definiciones alcanzables y expresiones disponibles. Estos análisis respaldan las optimizaciones entre bloques.\n\nAlcance actual\nLa pestaña “Ejecución” muestra las reglas que el optimizador aplica al IR actual. Esta lista describe los temas; no significa que todas las variantes académicas estén implementadas.";
-            richTextBoxTiposOptimizacion.Name = "richTextBoxTiposOptimizacion";
-            richTextBoxTiposOptimizacion.Size = new Size(1106, 855);
-            richTextBoxTiposOptimizacion.TabIndex = 0;
-            //
-            // tabPageResultadoOptimizacion
-            //
-            tabPageResultadoOptimizacion.BackColor = SystemColors.GradientActiveCaption;
-            tabPageResultadoOptimizacion.Location = new Point(4, 34);
-            tabPageResultadoOptimizacion.Name = "tabPageResultadoOptimizacion";
-            tabPageResultadoOptimizacion.Padding = new Padding(3);
-            tabPageResultadoOptimizacion.Size = new Size(1122, 871);
-            tabPageResultadoOptimizacion.TabIndex = 1;
-            tabPageResultadoOptimizacion.Text = "Ejecución";
-            tabPageResultadoOptimizacion.Controls.Add(tableLayoutOptimizacion);
             //
             // tableLayoutOptimizacion
             //
@@ -935,31 +885,12 @@
             //
             // panelAccionesOptimizacion
             //
-            panelAccionesOptimizacion.Controls.Add(lblTipoOptimizacion);
-            panelAccionesOptimizacion.Controls.Add(cmbTipoOptimizacion);
             panelAccionesOptimizacion.Controls.Add(btnOptimizar);
-            panelAccionesOptimizacion.Controls.Add(lblCostoEstimado);
             panelAccionesOptimizacion.Dock = DockStyle.Fill;
             panelAccionesOptimizacion.FlowDirection = FlowDirection.LeftToRight;
             panelAccionesOptimizacion.Name = "panelAccionesOptimizacion";
             panelAccionesOptimizacion.WrapContents = false;
             //
-            // lblTipoOptimizacion
-            //
-            lblTipoOptimizacion.AutoSize = true;
-            lblTipoOptimizacion.Margin = new Padding(3, 10, 3, 3);
-            lblTipoOptimizacion.Name = "lblTipoOptimizacion";
-            lblTipoOptimizacion.Text = "Pasada:";
-            //
-            // cmbTipoOptimizacion
-            //
-            cmbTipoOptimizacion.DropDownStyle = ComboBoxStyle.DropDownList;
-            cmbTipoOptimizacion.Items.AddRange(new object[] { "Local", "Ciclos", "Global", "Mirilla", "Todas" });
-            cmbTipoOptimizacion.Margin = new Padding(3, 5, 8, 3);
-            cmbTipoOptimizacion.Name = "cmbTipoOptimizacion";
-            cmbTipoOptimizacion.Size = new Size(140, 33);
-            cmbTipoOptimizacion.TabIndex = 0;
-            cmbTipoOptimizacion.SelectedIndex = 4;
             //
             // btnOptimizar
             //
@@ -967,19 +898,10 @@
             btnOptimizar.Margin = new Padding(3, 3, 12, 3);
             btnOptimizar.Name = "btnOptimizar";
             btnOptimizar.Size = new Size(130, 35);
-            btnOptimizar.TabIndex = 1;
+            btnOptimizar.TabIndex = 0;
             btnOptimizar.Text = "Optimizar";
             btnOptimizar.UseVisualStyleBackColor = true;
             //
-            // lblCostoEstimado
-            //
-            lblCostoEstimado.AutoEllipsis = true;
-            lblCostoEstimado.AutoSize = false;
-            lblCostoEstimado.Margin = new Padding(3, 3, 3, 3);
-            lblCostoEstimado.Name = "lblCostoEstimado";
-            lblCostoEstimado.Size = new Size(620, 40);
-            lblCostoEstimado.Text = "Las cifras de costo, memoria, registros y pila son estimaciones, no mediciones reales.";
-            lblCostoEstimado.TextAlign = ContentAlignment.MiddleLeft;
             //
             // groupCodigoTresDireccionesOpt
             //
@@ -988,7 +910,7 @@
             groupCodigoTresDireccionesOpt.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
             groupCodigoTresDireccionesOpt.Name = "groupCodigoTresDireccionesOpt";
             groupCodigoTresDireccionesOpt.Padding = new Padding(8);
-            groupCodigoTresDireccionesOpt.Text = "Código de tres direcciones";
+            groupCodigoTresDireccionesOpt.Text = "Cuádruplos optimizados";
             //
             // rtxCodigoTresDireccionesOpt
             //
@@ -1455,15 +1377,9 @@
         private DataGridViewTextBoxColumn dataGridViewTextBoxColumn10;
         private TabPage tabPage4;
         private TabPage tabPageOptimizacion;
-        private TabControl tabControlOptimizacion;
-        private TabPage tabPageTiposOptimizacion;
-        private TabPage tabPageResultadoOptimizacion;
         private TableLayoutPanel tableLayoutOptimizacion;
         private FlowLayoutPanel panelAccionesOptimizacion;
-        private Label lblTipoOptimizacion;
-        private ComboBox cmbTipoOptimizacion;
         private Button btnOptimizar;
-        private Label lblCostoEstimado;
         private GroupBox groupCodigoTresDireccionesOpt;
         private RichTextBox rtxCodigoTresDireccionesOpt;
         private GroupBox groupCodigoPOpt;
@@ -1474,7 +1390,6 @@
         private RichTextBox rtxNotacionPolacaInversaOpt;
         private GroupBox groupInformeOptimizacion;
         private RichTextBox rtxInformeOptimizacion;
-        private RichTextBox richTextBoxTiposOptimizacion;
         private Label label6;
         private PictureBox pictureBox4;
         private GroupBox groupBox4;

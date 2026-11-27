@@ -6,18 +6,10 @@ using System.Text.RegularExpressions;
 
 namespace AnalizadorLexico
 {
-    public enum TipoOptimizacion
-    {
-        Local,
-        Ciclos,
-        Global,
-        Mirilla,
-        Todas
-    }
-
     public class Optimizacion
     {
         private readonly List<string> _informeOptimizacion = new();
+        public List<string> LogOptimizacion { get; } = new();
 
         public int InstruccionesAntesOptimizacion { get; private set; }
         public int InstruccionesDespuesOptimizacion { get; private set; }
@@ -33,15 +25,15 @@ namespace AnalizadorLexico
         public int MemoriaEstimadaAntesOptimizacion { get; private set; }
         public int MemoriaEstimadaDespuesOptimizacion { get; private set; }
         public string InformeOptimizacion => string.Join(Environment.NewLine, _informeOptimizacion);
-        public List<Cuadruplo> Optimizar(IReadOnlyCollection<Cuadruplo> codigo, TipoOptimizacion tipo = TipoOptimizacion.Todas)
+        public List<Cuadruplo> Optimizar(List<Cuadruplo> originales)
         {
-            ArgumentNullException.ThrowIfNull(codigo);
-            if (!Enum.IsDefined(tipo)) throw new ArgumentOutOfRangeException(nameof(tipo));
-            List<Cuadruplo> optimizado = codigo.Select(ClonarCuadruplo).ToList();
+            ArgumentNullException.ThrowIfNull(originales);
+            List<Cuadruplo> optimizado = originales.Select(ClonarCuadruplo).ToList();
             ValidarOperadores(optimizado);
             ValidarEtiquetas(optimizado);
 
             _informeOptimizacion.Clear();
+            LogOptimizacion.Clear();
             InstruccionesAntesOptimizacion = optimizado.Count;
             BloquesBasicos = ConstruirBloques(optimizado).Count;
             CostoAntesOptimizacion = CalcularCostoEstructural(optimizado);
@@ -49,20 +41,10 @@ namespace AnalizadorLexico
             PilaEstimadaAntesOptimizacion = EstimarPicoPila(optimizado);
             RegistrosEstimadosAntesOptimizacion = ContarTemporales(optimizado);
             MemoriaEstimadaAntesOptimizacion = EstimarMemoria(optimizado);
-
-            List<Cuadruplo> codigoAntesOptimizacion = optimizado.Select(ClonarCuadruplo).ToList();
-            _informeOptimizacion.Add($"Pasada seleccionada: {tipo}.");
-            if (tipo is TipoOptimizacion.Local or TipoOptimizacion.Todas)
-                OptimizarConstantesLocales(optimizado);
-            if (tipo is TipoOptimizacion.Ciclos or TipoOptimizacion.Todas)
-                AplicarOptimizacionDeBucles(optimizado);
-            if (tipo is TipoOptimizacion.Global or TipoOptimizacion.Todas)
-            {
-                AplicarOptimizacionGlobal(optimizado);
-                EliminarTemporalesMuertos(optimizado);
-            }
-            if (tipo is TipoOptimizacion.Mirilla or TipoOptimizacion.Todas)
-                AplicarOptimizacionDeMirilla(optimizado);
+            AplicarOptimizacionesLocales(optimizado);
+            AplicarOptimizacionesGlobales(optimizado);
+            AplicarOptimizacionesBucles(optimizado);
+            AplicarOptimizacionesMirilla(optimizado);
             RenumerarCuadruplos(optimizado);
 
             ValidarOperadores(optimizado);
@@ -73,15 +55,23 @@ namespace AnalizadorLexico
             PilaEstimadaDespuesOptimizacion = EstimarPicoPila(optimizado);
             RegistrosEstimadosDespuesOptimizacion = ContarTemporales(optimizado);
             MemoriaEstimadaDespuesOptimizacion = EstimarMemoria(optimizado);
-            if (CuadruplosIguales(codigoAntesOptimizacion, optimizado))
-                _informeOptimizacion.Add("No hubo cambios en el código para la pasada seleccionada.");
-            _informeOptimizacion.Add($"Bloques básicos analizados: {BloquesBasicos}.");
-            _informeOptimizacion.Add($"Instrucciones IR: {InstruccionesAntesOptimizacion} → {InstruccionesDespuesOptimizacion}.");
-            _informeOptimizacion.Add($"Temporales distintos: {TemporalesAntesOptimizacion} → {TemporalesDespuesOptimizacion}.");
-            _informeOptimizacion.Add($"Costo estructural: {CostoAntesOptimizacion} → {CostoDespuesOptimizacion}; pila: {PilaEstimadaAntesOptimizacion} → {PilaEstimadaDespuesOptimizacion}; registros: {RegistrosEstimadosAntesOptimizacion} → {RegistrosEstimadosDespuesOptimizacion}; memoria: {MemoriaEstimadaAntesOptimizacion} → {MemoriaEstimadaDespuesOptimizacion} bytes.");
-            _informeOptimizacion.Add("Costo: estimación por pesos de IR, no medición real de registros, memoria, pila o tiempo de máquina.");
+            if (LogOptimizacion.Count == 0)
+                LogOptimizacion.Add("No se encontraron optimizaciones aplicables.");
+            _informeOptimizacion.AddRange(LogOptimizacion);
             return optimizado;
         }
+
+        private void AplicarOptimizacionesLocales(List<Cuadruplo> instrucciones) => OptimizarConstantesLocales(instrucciones);
+
+        private void AplicarOptimizacionesGlobales(List<Cuadruplo> instrucciones)
+        {
+            AplicarOptimizacionGlobal(instrucciones);
+            EliminarTemporalesMuertos(instrucciones);
+        }
+
+        private void AplicarOptimizacionesBucles(List<Cuadruplo> instrucciones) => AplicarOptimizacionDeBucles(instrucciones);
+
+        private void AplicarOptimizacionesMirilla(List<Cuadruplo> instrucciones) => AplicarOptimizacionDeMirilla(instrucciones);
 
         private static bool CuadruplosIguales(IReadOnlyList<Cuadruplo> izquierda, IReadOnlyList<Cuadruplo> derecha) =>
             izquierda.Count == derecha.Count && izquierda.Zip(derecha).All(par =>
@@ -199,14 +189,18 @@ namespace AnalizadorLexico
         private void OptimizarConstantesLocales(List<Cuadruplo> instrucciones)
         {
             var bloques = ConstruirBloques(instrucciones);
-            bool aplicoRegla = false;
 
             foreach (var bloque in bloques)
             {
                 Dictionary<string, string> constantes = new(StringComparer.Ordinal);
+                Dictionary<string, string> expresiones = new(StringComparer.Ordinal);
                 for (int i = bloque.Inicio; i <= bloque.Fin; i++)
                 {
                     Cuadruplo instruccion = instrucciones[i];
+                    int numero = instruccion.Numero;
+                    string operadorOriginal = instruccion.Operador;
+                    string argumento1Original = instruccion.Argumento1;
+                    string argumento2Original = instruccion.Argumento2;
                     if (UsaArgumento1(instruccion.Operador) && constantes.TryGetValue(instruccion.Argumento1, out string? constante1))
                         instruccion.Argumento1 = constante1;
                     if (UsaArgumento2(instruccion.Operador) && constantes.TryGetValue(instruccion.Argumento2, out string? constante2))
@@ -215,12 +209,35 @@ namespace AnalizadorLexico
                     if (EsOperacionAritmetica(instruccion.Operador) &&
                         TryPlegarConstantes(instruccion, out string valorPlegado))
                     {
+                        string argumento1Plegado = instruccion.Argumento1;
+                        string argumento2Plegado = instruccion.Argumento2;
                         instruccion.Operador = "=";
                         instruccion.Argumento1 = valorPlegado;
                         instruccion.Argumento2 = string.Empty;
                         constantes[instruccion.Resultado] = valorPlegado;
-                        aplicoRegla = true;
+                        LogOptimizacion.Add($"Se aplicó Plegado de Constantes en cuádruplo {numero}: {argumento1Plegado} {operadorOriginal} {argumento2Plegado} = {valorPlegado}.");
                         continue;
+                    }
+
+                    if (AplicarIdentidadAlgebraica(instruccion))
+                    {
+                        constantes.Remove(instruccion.Resultado);
+                        LogOptimizacion.Add($"Se aplicó Simplificación algebraica en cuádruplo {numero}: {operadorOriginal} {argumento1Original} {argumento2Original} → = {instruccion.Argumento1}.");
+                    }
+                    else if (EsOperacionAritmetica(instruccion.Operador))
+                    {
+                        string clave = ConstruirClaveExpresion(instruccion);
+                        if (expresiones.TryGetValue(clave, out string? temporal))
+                        {
+                            instruccion.Operador = "=";
+                            instruccion.Argumento1 = temporal;
+                            instruccion.Argumento2 = string.Empty;
+                            LogOptimizacion.Add($"Se aplicó Eliminación de Subexpresión Común en cuádruplo {numero}: {operadorOriginal} {argumento1Original} {argumento2Original} reutiliza {temporal}.");
+                        }
+                        else
+                        {
+                            expresiones[clave] = instruccion.Resultado;
+                        }
                     }
 
                     if (instruccion.Operador == "READ")
@@ -236,20 +253,26 @@ namespace AnalizadorLexico
                     {
                         constantes.Remove(instruccion.Resultado);
                     }
+
+                    foreach (string definicion in ObtenerDefiniciones(instruccion))
+                    {
+                        foreach (string clave in expresiones.Keys
+                            .Where(clave => clave.Contains($"|{definicion}|", StringComparison.Ordinal))
+                            .ToList())
+                            expresiones.Remove(clave);
+                    }
                 }
             }
-
-            if (aplicoRegla) _informeOptimizacion.Add("Local: plegado de expresiones aritméticas constantes.");
         }
 
         private static bool TryPlegarConstantes(Cuadruplo instruccion, out string resultado)
         {
             resultado = string.Empty;
-            if (instruccion.Operador is not "+" and not "-" and not "*" ||
-                (!instruccion.Argumento1.Contains('.') && !instruccion.Argumento1.Contains('e') && !instruccion.Argumento1.Contains('E')) ||
-                (!instruccion.Argumento2.Contains('.') && !instruccion.Argumento2.Contains('e') && !instruccion.Argumento2.Contains('E')) ||
+            if (instruccion.Operador is not "+" and not "-" and not "*" and not "/" ||
                 !decimal.TryParse(instruccion.Argumento1, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal izquierda) ||
                 !decimal.TryParse(instruccion.Argumento2, NumberStyles.Float, CultureInfo.InvariantCulture, out decimal derecha))
+                return false;
+            if (instruccion.Operador == "/" && derecha == 0)
                 return false;
 
             try
@@ -259,6 +282,7 @@ namespace AnalizadorLexico
                     "+" => izquierda + derecha,
                     "-" => izquierda - derecha,
                     "*" => izquierda * derecha,
+                    "/" when derecha != 0 => izquierda / derecha,
                     _ => throw new InvalidOperationException()
                 };
                 resultado = valor.ToString(CultureInfo.InvariantCulture);
@@ -268,53 +292,101 @@ namespace AnalizadorLexico
             {
                 return false;
             }
+            catch (DivideByZeroException)
+            {
+                return false;
+            }
         }
 
         private void AplicarOptimizacionDeBucles(List<Cuadruplo> instrucciones)
         {
-            _informeOptimizacion.Add("Ciclos: no se movieron expresiones; el IR actual no permite probar que la operación se ejecutaría exactamente en las mismas rutas.");
+            for (int saltoIndice = instrucciones.Count - 1; saltoIndice >= 0; saltoIndice--)
+            {
+                Cuadruplo salto = instrucciones[saltoIndice];
+                if (salto.Operador != "GOTO") continue;
+                int inicio = instrucciones.FindIndex(c => c.Operador == "LABEL" && c.Resultado == salto.Resultado);
+                if (inicio < 0 || inicio >= saltoIndice) continue;
+
+                bool entradaExterna = instrucciones
+                    .Select((c, i) => (Cuadruplo: c, Indice: i))
+                    .Any(x => x.Indice != saltoIndice &&
+                        (x.Cuadruplo.Operador is "GOTO" or "IF_FALSE" or "IF_TRUE") &&
+                        x.Cuadruplo.Resultado == salto.Resultado);
+                if (entradaExterna) continue;
+
+                HashSet<string> etiquetasCuerpo = instrucciones
+                    .Skip(inicio + 1).Take(saltoIndice - inicio - 1)
+                    .Where(c => c.Operador is "IF_FALSE" or "IF_TRUE")
+                    .Select(c => c.Resultado)
+                    .ToHashSet(StringComparer.Ordinal);
+                int etiquetaCuerpo = instrucciones.FindIndex(inicio + 1, saltoIndice - inicio - 1,
+                    c => c.Operador == "LABEL" && etiquetasCuerpo.Contains(c.Resultado));
+                if (etiquetaCuerpo < 0) continue;
+
+                HashSet<string> definidasEnBucle = instrucciones
+                    .Skip(inicio + 1).Take(saltoIndice - inicio - 1)
+                    .SelectMany(ObtenerDefiniciones)
+                    .ToHashSet(StringComparer.Ordinal);
+
+                for (int i = etiquetaCuerpo + 1; i < saltoIndice; i++)
+                {
+                    Cuadruplo candidato = instrucciones[i];
+                    if (candidato.Operador is not "+" and not "-" and not "*") break;
+                    string destino = candidato.Resultado;
+                    if (definidasEnBucle.Contains(candidato.Argumento1) || definidasEnBucle.Contains(candidato.Argumento2)) break;
+
+                    int definicionesDestino = instrucciones
+                        .Skip(inicio + 1).Take(saltoIndice - inicio - 1)
+                        .SelectMany(ObtenerDefiniciones)
+                        .Count(definicion => definicion == destino);
+                    bool resultadoUsadoAntes = instrucciones
+                        .Select((c, indice) => (Cuadruplo: c, Indice: indice))
+                        .Any(x => x.Indice > inicio && x.Indice < i && ObtenerUsos(x.Cuadruplo).Contains(destino, StringComparer.Ordinal));
+                    if (definicionesDestino != 1 || resultadoUsadoAntes) break;
+
+                    bool resultadoUsadoEnBucle = instrucciones
+                        .Select((c, indice) => (Cuadruplo: c, Indice: indice))
+                        .Any(x => x.Indice > i && x.Indice < saltoIndice && ObtenerUsos(x.Cuadruplo).Contains(destino, StringComparer.Ordinal));
+                    bool resultadoUsadoFuera = instrucciones
+                        .Select((c, indice) => (Cuadruplo: c, Indice: indice))
+                        .Any(x => (x.Indice < inicio || x.Indice > saltoIndice) && ObtenerUsos(x.Cuadruplo).Contains(destino, StringComparer.Ordinal));
+                    if (!resultadoUsadoEnBucle || resultadoUsadoFuera) continue;
+
+                    int numero = candidato.Numero;
+                    string expresion = $"{candidato.Argumento1} {candidato.Operador} {candidato.Argumento2}";
+                    instrucciones.RemoveAt(i);
+                    instrucciones.Insert(inicio, candidato);
+                    LogOptimizacion.Add($"Se sacó operación invariante del bucle {salto.Resultado} en cuádruplo {numero}: {expresion} → {destino}.");
+                    saltoIndice--;
+                    break;
+                }
+            }
         }
 
         private void AplicarOptimizacionGlobal(List<Cuadruplo> instrucciones)
         {
             var bloques = ConstruirBloques(instrucciones);
-            int sustituciones = 0;
-            int expresionesEliminadas = 0;
 
             foreach (var bloque in bloques)
             {
                 Dictionary<string, string> copias = new(StringComparer.Ordinal);
-                Dictionary<string, string> expresionesDisponibles = new(StringComparer.Ordinal);
 
                 for (int i = bloque.Inicio; i <= bloque.Fin; i++)
                 {
                     Cuadruplo instruccion = instrucciones[i];
+                    int numero = instruccion.Numero;
 
                     if (UsaArgumento1(instruccion.Operador) && copias.TryGetValue(instruccion.Argumento1, out string? copia1))
                     {
+                        string original = instruccion.Argumento1;
                         instruccion.Argumento1 = copia1;
-                        sustituciones++;
+                        LogOptimizacion.Add($"Se aplicó Propagación de Copias en cuádruplo {numero}: {original} → {copia1}.");
                     }
                     if (UsaArgumento2(instruccion.Operador) && copias.TryGetValue(instruccion.Argumento2, out string? copia2))
                     {
+                        string original = instruccion.Argumento2;
                         instruccion.Argumento2 = copia2;
-                        sustituciones++;
-                    }
-
-                    if (EsOperacionAritmetica(instruccion.Operador))
-                    {
-                        string clave = ConstruirClaveExpresion(instruccion);
-                        if (expresionesDisponibles.TryGetValue(clave, out string? temporalPrevio))
-                        {
-                            instruccion.Operador = "=";
-                            instruccion.Argumento1 = temporalPrevio;
-                            instruccion.Argumento2 = string.Empty;
-                            expresionesEliminadas++;
-                        }
-                        else
-                        {
-                            expresionesDisponibles[clave] = instruccion.Resultado;
-                        }
+                        LogOptimizacion.Add($"Se aplicó Propagación de Copias en cuádruplo {numero}: {original} → {copia2}.");
                     }
 
                     List<string> definiciones = ObtenerDefiniciones(instruccion).ToList();
@@ -330,25 +402,12 @@ namespace AnalizadorLexico
 
                     if (instruccion.Operador == "=")
                     {
-                        if (!EsTemporal(instruccion.Argumento1) && EsLiteral(instruccion.Argumento1))
-                            copias[instruccion.Resultado] = instruccion.Argumento1;
-                        else if ((EsIdentificador(instruccion.Argumento1) || EsTemporal(instruccion.Argumento1)) &&
+                        if ((EsIdentificador(instruccion.Argumento1) || EsTemporal(instruccion.Argumento1)) &&
                                  instruccion.Argumento1 != instruccion.Resultado)
                             copias[instruccion.Resultado] = instruccion.Argumento1;
                     }
-
-                    foreach (string operandoModificado in ObtenerDefiniciones(instruccion))
-                    {
-                        foreach (string clave in expresionesDisponibles.Keys
-                            .Where(clave => clave.Contains($"|{operandoModificado}|", StringComparison.Ordinal))
-                            .ToList())
-                            expresionesDisponibles.Remove(clave);
-                    }
                 }
             }
-
-            if (sustituciones > 0) _informeOptimizacion.Add($"Global: propagación de copias en {sustituciones} operandos.");
-            if (expresionesEliminadas > 0) _informeOptimizacion.Add($"Global: {expresionesEliminadas} expresiones comunes eliminadas dentro de bloques básicos.");
         }
 
         private void EliminarTemporalesMuertos(List<Cuadruplo> instrucciones)
@@ -364,9 +423,12 @@ namespace AnalizadorLexico
                 for (int i = bloque.Fin; i >= bloque.Inicio; i--)
                 {
                     Cuadruplo instruccion = instrucciones[i];
-                    if (EsTemporal(instruccion.Resultado) && instruccion.Operador == "=" && !vivas.Contains(instruccion.Resultado))
+                    if (EsTemporal(instruccion.Resultado) &&
+                        (instruccion.Operador is "=" or "+" or "-" or "*" or ">" or "<" or ">=" or "<=" or "==" or "!=" or "AND" or "OR") &&
+                        !vivas.Contains(instruccion.Resultado))
                     {
                         indicesEliminar.Add(i);
+                        LogOptimizacion.Add($"Se aplicó Eliminación de Código Muerto en cuádruplo {instruccion.Numero}: {instruccion.Operador} {instruccion.Argumento1} {instruccion.Argumento2} → {instruccion.Resultado} no tiene usos.");
                         continue;
                     }
 
@@ -379,7 +441,6 @@ namespace AnalizadorLexico
                 List<Cuadruplo> conservadas = instrucciones.Where((_, indice) => !indicesEliminar.Contains(indice)).ToList();
                 instrucciones.Clear();
                 instrucciones.AddRange(conservadas);
-                _informeOptimizacion.Add($"Global: se eliminaron {indicesEliminar.Count} temporales sin usos vivos.");
             }
         }
 
@@ -597,9 +658,6 @@ namespace AnalizadorLexico
 
         private void AplicarOptimizacionDeMirilla(List<Cuadruplo> instrucciones)
         {
-            int saltosEliminados = 0;
-            int instruccionesInalcanzables = 0;
-            int identidadesEliminadas = 0;
             bool cambio;
             do
             {
@@ -607,12 +665,6 @@ namespace AnalizadorLexico
                 for (int i = 0; i < instrucciones.Count; i++)
                 {
                     Cuadruplo instruccion = instrucciones[i];
-
-                    if (AplicarIdentidadAlgebraica(instruccion))
-                    {
-                        identidadesEliminadas++;
-                        cambio = true;
-                    }
 
                     if (instruccion.Operador is "IF_FALSE" or "IF_TRUE")
                     {
@@ -623,18 +675,23 @@ namespace AnalizadorLexico
                         {
                             bool valor = constanteEncontrada ? constante : enteroEncontrado ? entero != 0 : real != 0.0;
                             bool saltar = instruccion.Operador == "IF_TRUE" ? valor : !valor;
+                            int numero = instruccion.Numero;
+                            string condicion = instruccion.Argumento1;
+                            string destino = instruccion.Resultado;
                             if (saltar)
                             {
                                 instruccion.Operador = "GOTO";
                                 instruccion.Argumento1 = string.Empty;
+                                LogOptimizacion.Add($"Se aplicó Simplificación de salto en cuádruplo {numero}: condición constante {condicion}; se conservó el salto a {destino}.");
                             }
                             else
                             {
                                 instrucciones.RemoveAt(i);
                                 i--;
+                                LogOptimizacion.Add($"Se aplicó Eliminación de salto en cuádruplo {numero}: condición constante {condicion}; el salto a {destino} nunca se ejecuta.");
                             }
-                            saltosEliminados++;
                             cambio = true;
+                            continue;
                         }
                     }
 
@@ -646,7 +703,8 @@ namespace AnalizadorLexico
 
                         if (siguienteEtiqueta > i + 1)
                         {
-                            instruccionesInalcanzables += siguienteEtiqueta - i - 1;
+                            for (int muerto = i + 1; muerto < siguienteEtiqueta; muerto++)
+                                LogOptimizacion.Add($"Se aplicó Eliminación de Código Inalcanzable en cuádruplo {instrucciones[muerto].Numero}: {instrucciones[muerto].Operador} {instrucciones[muerto].Argumento1} {instrucciones[muerto].Argumento2} → {instrucciones[muerto].Resultado}.");
                             instrucciones.RemoveRange(i + 1, siguienteEtiqueta - i - 1);
                             cambio = true;
                         }
@@ -654,19 +712,14 @@ namespace AnalizadorLexico
                         if (instruccion.Operador == "GOTO" && i + 1 < instrucciones.Count &&
                             instrucciones[i + 1].Operador == "LABEL" && instrucciones[i + 1].Resultado == instruccion.Resultado)
                         {
+                            LogOptimizacion.Add($"Se aplicó Eliminación de Salto Redundante en cuádruplo {instruccion.Numero}: GOTO {instruccion.Resultado} seguido de LABEL {instruccion.Resultado}.");
                             instrucciones.RemoveAt(i);
-                            saltosEliminados++;
                             cambio = true;
                             i--;
                         }
                     }
                 }
             } while (cambio);
-
-            if (identidadesEliminadas > 0)
-                _informeOptimizacion.Add($"Mirilla: se simplificaron {identidadesEliminadas} identidades algebraicas.");
-            if (saltosEliminados > 0 || instruccionesInalcanzables > 0)
-                _informeOptimizacion.Add($"Mirilla: {saltosEliminados} saltos simplificados/eliminados y {instruccionesInalcanzables} instrucciones inalcanzables eliminados.");
         }
 
         private static bool AplicarIdentidadAlgebraica(Cuadruplo instruccion)

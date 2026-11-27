@@ -60,14 +60,6 @@ namespace AnalizadorLexico
 
             try
             {
-                TipoOptimizacion tipoSeleccionado = cmbTipoOptimizacion.SelectedItem?.ToString() switch
-                {
-                    "Local" => TipoOptimizacion.Local,
-                    "Ciclos" => TipoOptimizacion.Ciclos,
-                    "Global" => TipoOptimizacion.Global,
-                    "Mirilla" => TipoOptimizacion.Mirilla,
-                    _ => TipoOptimizacion.Todas
-                };
                 List<Cuadruplo> codigoOriginalCopia = _codigoIntermedioOriginal.Select(c => new Cuadruplo
                 {
                     Numero = c.Numero,
@@ -77,20 +69,17 @@ namespace AnalizadorLexico
                     Resultado = c.Resultado
                 }).ToList();
                 Optimizacion optimizador = new();
-                List<Cuadruplo> codigoOptimizado = optimizador.Optimizar(codigoOriginalCopia, tipoSeleccionado);
+                List<Cuadruplo> codigoOptimizado = optimizador.Optimizar(codigoOriginalCopia);
                 CodigoIntermedio generadorOptimizado = new();
                 generadorOptimizado.GenerarDesdeCuadruplos(codigoOptimizado);
 
-                int diferencia = optimizador.InstruccionesAntesOptimizacion - optimizador.InstruccionesDespuesOptimizacion;
-                int diferenciaCosto = optimizador.CostoAntesOptimizacion - optimizador.CostoDespuesOptimizacion;
-                lblCostoEstimado.Text = $"Instrucciones: {optimizador.InstruccionesAntesOptimizacion} → {optimizador.InstruccionesDespuesOptimizacion} (Δ {diferencia:+#;-#;0}); costo estructural: {optimizador.CostoAntesOptimizacion} → {optimizador.CostoDespuesOptimizacion} (Δ {diferenciaCosto:+#;-#;0}); estimaciones — pila: {optimizador.PilaEstimadaAntesOptimizacion} → {optimizador.PilaEstimadaDespuesOptimizacion}, registros: {optimizador.RegistrosEstimadosAntesOptimizacion} → {optimizador.RegistrosEstimadosDespuesOptimizacion}, memoria: {optimizador.MemoriaEstimadaAntesOptimizacion} → {optimizador.MemoriaEstimadaDespuesOptimizacion} bytes.";
-                rtxCodigoTresDireccionesOpt.Text = generadorOptimizado.CodigoTresDireccionesCuadruplos;
+                rtxCodigoTresDireccionesOpt.Text = string.Join(Environment.NewLine, codigoOptimizado.Select(c =>
+                    $"{c.Numero}: ({c.Operador}, {c.Argumento1}, {c.Argumento2}, {c.Resultado})"));
                 rtxCodigoPOpt.Text = string.Join(Environment.NewLine, generadorOptimizado.CodigoP);
                 rtxNotacionPolacaOpt.Text = generadorOptimizado.NotacionPrefija;
                 rtxNotacionPolacaInversaOpt.Text = generadorOptimizado.NotacionPostfija;
-                rtxInformeOptimizacion.Text = optimizador.InformeOptimizacion;
+                rtxInformeOptimizacion.Text = string.Join(Environment.NewLine, optimizador.LogOptimizacion);
                 tabControl1.SelectedTab = tabPageOptimizacion;
-                tabControlOptimizacion.SelectedTab = tabPageResultadoOptimizacion;
             }
             catch (InvalidOperationException ex)
             {
@@ -392,7 +381,6 @@ namespace AnalizadorLexico
             rtxNotacionPolacaOpt.Clear();
             rtxNotacionPolacaInversaOpt.Clear();
             rtxInformeOptimizacion.Clear();
-            lblCostoEstimado.Text = "Las cifras de costo, memoria, registros y pila son estimaciones, no mediciones reales.";
             btnOptimizar.Enabled = false;
 
             richTextBox2.Clear();
