@@ -5,8 +5,8 @@ namespace AnalizadorLexico
     public class AnalizadorLexico
     {
         // Cadena de conexión
-        //protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
-        protected string connectionString = "Server=tcp:Anapaula,1433;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        protected string connectionString = "Server=Eva;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
+        //protected string connectionString = "Server=tcp:Anapaula,1433;Database=AnalizadorLexico;Trusted_Connection=True;TrustServerCertificate=True;";
 
         private static readonly Dictionary<char, string> simbolos = new()
         {
