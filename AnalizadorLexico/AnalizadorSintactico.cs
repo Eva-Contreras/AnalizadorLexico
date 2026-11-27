@@ -44,6 +44,7 @@
                 case "PR1": ParseLeer(); break;
                 case "PR2": ParseImprimir(); break;
                 case "PR3": ParseRetornar(); break;
+                case "PR14": ParseFuncion(); break;
                 case "PR4": ParseSentenciaIf(); break;
                 case "PR6": ParseCasos(); break;
                 case "PR9": ParseMientras(); break;
@@ -53,7 +54,12 @@
                 case "PR13": ParseUbicar(); break;
                 default:
                     if (EsID(TokenActual.token))
-                        ParseAsignacion();
+                    {
+                        if (_pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                            ParseLlamadaFuncion();
+                        else
+                            ParseAsignacion();
+                    }
                     else
                     {
                         Error($"Sentencia no reconocida '{TokenActual.valor}' ({TokenActual.token}) en línea {_ultimaLineaConsumida}");
@@ -63,6 +69,48 @@
             }
         }
 
+        private void ParseLlamadaFuncion()
+        {
+            int inicio = _pos;
+            ParseLlamadaFuncionExpresion();
+            CallNode? llamada = ConstruirExpresion(inicio, _pos) as CallNode;
+            Consumir("CD5", "Se esperaba ';' al final de la llamada de función");
+            if (llamada != null)
+                _sentenciasActuales.Add(llamada);
+        }
+
+        private void ParseFuncion()
+        {
+            Consumir("PR14", "Se esperaba 'FUNCION'");
+            string nombre = LeerIdentificador();
+            Consumir("CD3", "Se esperaba '(' después del nombre de la función");
+            FunctionNode funcion = new() { Nombre = nombre };
+
+            if (TokenActual.token != "CD4")
+            {
+                do
+                {
+                    string tipo = TokenActual.token;
+                    if (tipo != "ENT" && tipo != "DEC" && tipo != "CAD")
+                    {
+                        Error($"Se esperaba tipo de parámetro en función '{nombre}' en línea {TokenActual.linea}");
+                        return;
+                    }
+                    Avanzar();
+                    string id = LeerIdentificador();
+                    funcion.Parametros.Add(new FunctionParameterNode { Tipo = tipo, Nombre = id });
+                    if (TokenActual.token != "CD6") break;
+                    Avanzar();
+                } while (TokenActual.token != "CD4" && TokenActual.token != "EOF");
+            }
+
+            Consumir("CD4", "Se esperaba ')' después de los parámetros");
+            Consumir("CD1", "Se esperaba '{' al iniciar el cuerpo de la función");
+            funcion.Cuerpo = ParseBloque();
+            Consumir("CD2", "Se esperaba '}' al cerrar el cuerpo de la función");
+            _sentenciasActuales.Add(funcion);
+        }
+
         private void ParseDeclaracionENT()
         {
             Pasos.Add("[ENT] Declaración entera...");
@@ -70,26 +118,8 @@
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
             int inicioExpresion = _pos;
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-            {
-                ParseARG2();
-            }
-            else
-            {
-
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
-            valorNode = ConstruirExpresion(inicioExpresion, _pos);
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de declaración ENT");
             var decl = new DeclarationNode { Tipo = "ENT", Identificador = id, Valor = valorNode };
             _sentenciasActuales.Add(decl);
@@ -103,23 +133,8 @@
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
             int inicioExpresion = _pos;
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-                ParseARG2();
-            else
-            {
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
-            valorNode = ConstruirExpresion(inicioExpresion, _pos);
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de declaración DEC");
             var decl = new DeclarationNode { Tipo = "DEC", Identificador = id, Valor = valorNode };
             _sentenciasActuales.Add(decl);
@@ -133,52 +148,22 @@
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' después del identificador");
             int inicioExpresion = _pos;
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-                ParseARG2();
-            else
-            {
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
-            valorNode = ConstruirExpresion(inicioExpresion, _pos);
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de declaración CAD");
             var decl = new DeclarationNode { Tipo = "CAD", Identificador = id, Valor = valorNode };
             _sentenciasActuales.Add(decl);
             Pasos.Add("[CAD] Declaración reconocida ✔");
         }
- 
+
         private void ParseAsignacion()
         {
             Pasos.Add($"[ASIG] Asignación a '{TokenActual.valor}'...");
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' en asignación");
             int inicioExpresion = _pos;
-            var valorNode = BuildSimpleExprNode();
-            if (valorNode == null)
-                ParseARG2();
-            else
-            {
-                if (EsOA(TokenActual.token))
-                {
-                    ParseOPARest();
-                    valorNode = null;
-                }
-                else if (TokenActual.token == "CD3")
-                {
-                    ParseOPA();
-                    valorNode = null;
-                }
-            }
-            valorNode = ConstruirExpresion(inicioExpresion, _pos);
+            ParseARG2();
+            AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de asignación");
             var assign = new AssignmentNode { Identificador = id, Valor = valorNode };
             _sentenciasActuales.Add(assign);
@@ -517,6 +502,11 @@
             }
             else if (EsID(TokenActual.token) || EsCN(TokenActual.token))
             {
+                if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                {
+                    ParseLlamadaFuncionExpresion();
+                    return;
+                }
                 int posTemp = _pos + 1;
                 bool esOpa = posTemp < _tokens.Count && EsOA(_tokens[posTemp].token);
                 if (esOpa) ParseOPA();
@@ -530,6 +520,13 @@
         private void ParseARG2()
         {
             Pasos.Add($"[ARG2] token: {TokenActual.token} '{TokenActual.valor}'");
+
+            if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+            {
+                ParseLlamadaFuncionExpresion();
+                ParseOPARest();
+                return;
+            }
 
             if (EsCadeLiteral(TokenActual.token))
             {
@@ -555,6 +552,25 @@
                 ParseOPA();
             else
                 Error($"Se esperaba argumento válido en ARG2, se encontró '{TokenActual.valor}'");
+        }
+
+        private void ParseLlamadaFuncionExpresion()
+        {
+            Avanzar();
+            Consumir("CD3", "Se esperaba '(' en llamada de función");
+            if (TokenActual.token == "CD4")
+            {
+                Avanzar();
+                return;
+            }
+
+            ParseARG2();
+            while (TokenActual.token == "CD6")
+            {
+                Avanzar();
+                ParseARG2();
+            }
+            Consumir("CD4", "Se esperaba ')' al cerrar llamada de función");
         }
 
         private void ParseARG3()
@@ -621,6 +637,8 @@
             }
             if (EsID(TokenActual.token))
             {
+                if (_pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                    return null;
                 var node = new IdentifierNode { Nombre = TokenActual.valor };
                 Avanzar();
                 return node;
@@ -730,6 +748,25 @@
             if (token.StartsWith("IDV", StringComparison.Ordinal))
             {
                 indice++;
+                if (indice < tokens.Count && tokens[indice].token == "CD3")
+                {
+                    indice++;
+                    CallNode llamada = new() { NombreFuncion = valor };
+                    if (indice < tokens.Count && tokens[indice].token != "CD4")
+                    {
+                        while (true)
+                        {
+                            ExpressionNode? argumento = ParseExpresionSuma(tokens, ref indice);
+                            if (argumento == null) return null;
+                            llamada.Argumentos.Add(argumento);
+                            if (indice >= tokens.Count || tokens[indice].token != "CD6") break;
+                            indice++;
+                        }
+                    }
+                    if (indice >= tokens.Count || tokens[indice].token != "CD4") return null;
+                    indice++;
+                    return llamada;
+                }
                 return new IdentifierNode { Nombre = valor };
             }
             if (token == "CAD" || token == "CNU" || token == "CNR")
@@ -953,6 +990,8 @@
                 ParseOPA();
                 Consumir("CD4", "Se esperaba ')' después de OPA");
             }
+            else if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
+                ParseLlamadaFuncionExpresion();
             else if (EsID(TokenActual.token))
                 ParseID();
             else if (EsCN(TokenActual.token))

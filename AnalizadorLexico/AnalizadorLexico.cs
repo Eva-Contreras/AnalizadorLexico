@@ -68,6 +68,8 @@ namespace AnalizadorLexico
         {"limpiar", "PR12"},
         {"UBICAR", "PR13"},
         {"ubicar", "PR13"},
+        {"FUNCION", "PR14"},
+        {"funcion", "PR14"},
         {"Y", "OL1"},
         {"NO", "OL2"},
         {"O", "OL3"},
@@ -178,6 +180,15 @@ namespace AnalizadorLexico
 
                 recorrido += $" ⊣ (FDC) -> Token: {tokenReservado}";
                 return (true, tokenReservado, recorrido);
+            }
+
+            bool esTipoDeclaracion = string.Equals(cadena, "ENT", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(cadena, "DEC", StringComparison.OrdinalIgnoreCase) ||
+                                     string.Equals(cadena, "CAD", StringComparison.OrdinalIgnoreCase);
+            if (!esTipoDeclaracion && cadena.Length > 0 && char.IsLetter(cadena[0]) &&
+                cadena.Skip(1).All(char.IsLetterOrDigit))
+            {
+                return (true, "IDV", $"(0) {cadena} -> IDV");
             }
 
             // If the token is a numeric literal (integer or real) we return it directly

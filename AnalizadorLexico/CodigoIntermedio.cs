@@ -69,7 +69,20 @@ namespace AnalizadorLexico
         {
             ArgumentNullException.ThrowIfNull(programa);
             LimpiarResultados();
-            EmitirSentencias(programa.Statements);
+            List<FunctionNode> funciones = programa.Statements.OfType<FunctionNode>().ToList();
+            EmitirSentencias(programa.Statements.Where(sentencia => sentencia is not FunctionNode));
+            if (funciones.Count > 0)
+            {
+                string finFunciones = NuevaEtiqueta();
+                AgregarCuadruplo("GOTO", string.Empty, string.Empty, finFunciones);
+                foreach (FunctionNode funcion in funciones)
+                {
+                    AgregarCuadruplo("LABEL", string.Empty, string.Empty, funcion.Nombre);
+                    EmitirSentencias(funcion.Cuerpo.Statements);
+                    AgregarCuadruplo("RETURN", string.Empty, string.Empty, string.Empty);
+                }
+                AgregarCuadruplo("LABEL", string.Empty, string.Empty, finFunciones);
+            }
             ValidarOperadores(_cuadruplos);
             ValidarEtiquetas(_cuadruplos);
             GenerarTriplos();
@@ -152,6 +165,14 @@ namespace AnalizadorLexico
                     case SwitchNode seleccion:
                         EmitirSwitch(seleccion);
                         break;
+                    case CallNode llamada:
+                        EmitirExpresion(llamada);
+                        break;
+                    case FunctionNode funcion:
+                        AgregarCuadruplo("LABEL", string.Empty, string.Empty, funcion.Nombre);
+                        EmitirSentencias(funcion.Cuerpo.Statements);
+                        AgregarCuadruplo("RETURN", string.Empty, string.Empty, string.Empty);
+                        break;
                     default:
                         throw new InvalidOperationException($"No se puede generar IR para el nodo {sentencia.GetType().Name}.");
                 }
@@ -185,6 +206,15 @@ namespace AnalizadorLexico
                     string temporal = NuevaTemporal();
                     AgregarCuadruplo(binaria.Operador, izquierda, derecha, temporal);
                     return temporal;
+                case CallNode llamada:
+                    for (int i = 0; i < llamada.Argumentos.Count; i++)
+                    {
+                        string argumento = EmitirExpresion(llamada.Argumentos[i]);
+                        AgregarCuadruplo("PARAM", argumento, (i + 1).ToString(CultureInfo.InvariantCulture), string.Empty);
+                    }
+                    string resultadoLlamada = NuevaTemporal();
+                    AgregarCuadruplo("CALL", llamada.NombreFuncion, llamada.Argumentos.Count.ToString(CultureInfo.InvariantCulture), resultadoLlamada);
+                    return resultadoLlamada;
                 default:
                     throw new InvalidOperationException($"No se puede generar IR para la expresión {expresion?.GetType().Name ?? "nula"}.");
             }
@@ -238,6 +268,14 @@ namespace AnalizadorLexico
                         CargarOperando(instruccion.Argumento1);
                         _codigoP.Add("out");
                         break;
+                    case "PARAM":
+                        CargarOperando(instruccion.Argumento1);
+                        _codigoP.Add($"par {instruccion.Argumento2}");
+                        break;
+                    case "CALL":
+                        _codigoP.Add($"cal {instruccion.Argumento1}, {instruccion.Argumento2}");
+                        _codigoP.Add($"sto {instruccion.Resultado}");
+                        break;
                     case "RETURN":
                         if (!string.IsNullOrEmpty(instruccion.Argumento1)) CargarOperando(instruccion.Argumento1);
                         _codigoP.Add("ret");
@@ -269,7 +307,7 @@ namespace AnalizadorLexico
                 if (instruccion.Operador == "=")
                 {
                     _notacionPrefija.Add($"= {instruccion.Resultado} {instruccion.Argumento1}");
-                    _notacionPostfija.Add($"{instruccion.Resultado} {instruccion.Argumento1} =");
+                    _notacionPostfija.Add($"{instruccion.Argumento1} {instruccion.Resultado} =");
                 }
                 else if (binaria)
                 {
@@ -458,7 +496,7 @@ namespace AnalizadorLexico
             {
                 "=", "NEG", "NOT", "POS", "+", "-", "*", "/", "%", "^",
                 ">", "<", ">=", "<=", "==", "!=", "AND", "OR",
-                "LABEL", "GOTO", "IF_FALSE", "IF_TRUE", "READ", "PRINT", "RETURN", "CLEAR", "LOCATE"
+                "LABEL", "GOTO", "IF_FALSE", "IF_TRUE", "READ", "PRINT", "PARAM", "CALL", "RETURN", "CLEAR", "LOCATE"
             };
 
             foreach (Cuadruplo instruccion in instrucciones)
@@ -580,6 +618,14 @@ namespace AnalizadorLexico
                     string condicion = c.Operador == "IF_FALSE" ? "ifFalse" : "ifTrue";
                     _codigoTresDireccionesCuadruplos.Add($"{condicion} {c.Argumento1} goto {c.Resultado}");
                 }
+                else if (c.Operador == "PARAM")
+                {
+                    _codigoTresDireccionesCuadruplos.Add($"param {c.Argumento1} #{c.Argumento2}");
+                }
+                else if (c.Operador == "CALL")
+                {
+                    _codigoTresDireccionesCuadruplos.Add($"{c.Resultado} = call {c.Argumento1}, {c.Argumento2}");
+                }
                 else if (c.Operador == "READ" || c.Operador == "PRINT" || c.Operador == "RETURN" || c.Operador == "CLEAR" || c.Operador == "LOCATE")
                 {
                     _codigoTresDireccionesCuadruplos.Add($"{c.Operador.ToLowerInvariant()} {c.Argumento1}".TrimEnd());
@@ -624,6 +670,14 @@ namespace AnalizadorLexico
                 else if (t.Operador == "IF_FALSE" || t.Operador == "IF_TRUE")
                 {
                     instruccion = $"{(t.Operador == "IF_FALSE" ? "ifFalse" : "ifTrue")} {t.Argumento1} goto {t.Resultado}";
+                }
+                else if (t.Operador == "PARAM")
+                {
+                    instruccion = $"param {t.Argumento1} #{t.Argumento2}";
+                }
+                else if (t.Operador == "CALL")
+                {
+                    instruccion = $"{t.Resultado} = call {t.Argumento1}, {t.Argumento2}";
                 }
                 else if (t.Operador == "READ" || t.Operador == "PRINT" || t.Operador == "RETURN" || t.Operador == "CLEAR" || t.Operador == "LOCATE")
                 {

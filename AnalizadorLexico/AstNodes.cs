@@ -14,6 +14,25 @@ namespace AnalizadorLexico
         public List<AstNode> Statements { get; } = new();
     }
 
+    public class FunctionNode : AstNode
+    {
+        public string Nombre { get; set; } = "";
+        public List<FunctionParameterNode> Parametros { get; } = new();
+        public BlockNode Cuerpo { get; set; } = new();
+    }
+
+    public class FunctionParameterNode
+    {
+        public string Tipo { get; set; } = "";
+        public string Nombre { get; set; } = "";
+    }
+
+    public class CallNode : ExpressionNode
+    {
+        public string NombreFuncion { get; set; } = "";
+        public List<ExpressionNode> Argumentos { get; } = new();
+    }
+
     public class DeclarationNode : AstNode
     {
         public string Tipo { get; set; } = "";
