@@ -486,7 +486,7 @@ namespace AnalizadorLexico
                 Resultado = resultado
             });
         }
-
+        // hola 
         // =====================================================
         // GENERAR TRIPLOS
         // =====================================================

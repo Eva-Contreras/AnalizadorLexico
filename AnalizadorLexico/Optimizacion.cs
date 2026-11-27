@@ -45,7 +45,7 @@ namespace AnalizadorLexico
 
             return codigo;
         }
-
+        //hola
         // ========================================================
         // 1. OPTIMIZACIÓN LOCAL (Plegado y Simplificación)
         // ========================================================
