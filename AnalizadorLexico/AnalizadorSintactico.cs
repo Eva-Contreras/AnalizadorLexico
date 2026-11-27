@@ -162,7 +162,14 @@
             string id = LeerIdentificador();
             Consumir("OPA", "Se esperaba '=' en asignación");
             int inicioExpresion = _pos;
-            ParseARG2();
+
+            // ¡ESTA ES LA MAGIA! 
+            // Si el siguiente token es un número o un ID, obligamos a que evalúe la operación completa
+            if (EsID(TokenActual.token) || EsCN(TokenActual.token) || TokenActual.token == "CD3")
+                ParseOPA();
+            else
+                ParseARG2();
+
             AstNode? valorNode = ConstruirExpresion(inicioExpresion, _pos);
             Consumir("CD5", "Se esperaba ';' al final de asignación");
             var assign = new AssignmentNode { Identificador = id, Valor = valorNode };
@@ -530,7 +537,6 @@
 
             if (EsCadeLiteral(TokenActual.token))
             {
-                
                 int posTemp = _pos + 1;
                 if (posTemp < _tokens.Count && EsOA(_tokens[posTemp].token))
                     ParseOPA();
@@ -542,11 +548,16 @@
             }
             else if (EsID(TokenActual.token) || EsCN(TokenActual.token))
             {
+                // Verificamos si hay un operador matemático después (como +, -, *, /)
                 int posTemp = _pos + 1;
                 bool esOpa = posTemp < _tokens.Count && EsOA(_tokens[posTemp].token);
-                if (esOpa) ParseOPA();
-                else if (EsID(TokenActual.token)) ParseID();
-                else ParseCN();
+
+                if (esOpa)
+                    ParseOPA(); // Si hay operador, procesa toda la suma/resta
+                else if (EsID(TokenActual.token))
+                    ParseID();
+                else
+                    ParseCN();
             }
             else if (TokenActual.token == "CD3")
                 ParseOPA();

@@ -27,9 +27,9 @@ namespace AnalizadorLexico
 
             // 2. CAMBIO DE ORDEN: Primero Bucles, luego Locales
             AplicarOptimizacionesBucles(codigo);       // <-- Se mueve aquí
+            AplicarOptimizacionesGlobales(codigo);
             AplicarOptimizacionesLocales(codigo);      // <-- Ahora se aplica después
             AplicarOptimizacionesMirilla(codigo);
-            AplicarOptimizacionesGlobales(codigo);
             EliminarTemporalesMuertos(codigo);
 
             // 3. Renumeramos al final
@@ -71,9 +71,15 @@ namespace AnalizadorLexico
                 bool plegadoConstante = false;
 
                 if (constantes.TryGetValue(c.Argumento1, out string? constante1))
+                {
                     c.Argumento1 = constante1;
+                    LogOptimizacion.Add($"[Local] Propagación de constantes: se reemplazó '{argumentoOriginal1}' por '{constante1}'.");
+                }
                 if (constantes.TryGetValue(c.Argumento2, out string? constante2))
+                {
                     c.Argumento2 = constante2;
+                    LogOptimizacion.Add($"[Local] Propagación de constantes: se reemplazó '{argumentoOriginal2}' por '{constante2}'.");
+                }
 
                 // Plegado de constantes (ej. 5 + 3 = 8)
                 if (EsOperadorAritmetico(c.Operador) &&
@@ -106,9 +112,6 @@ namespace AnalizadorLexico
 
                 if (!plegadoConstante && c.Operador == "=")
                 {
-                    if (constantes.TryGetValue(argumentoOriginal1, out string? constanteAsignada))
-                        c.Argumento1 = constanteAsignada;
-
                     if (origenes.TryGetValue(argumentoOriginal1, out string? origenAsignado) &&
                         EsNumero(c.Argumento1))
                     {
@@ -204,9 +207,34 @@ namespace AnalizadorLexico
         // ========================================================
         private void AplicarOptimizacionesMirilla(List<Cuadruplo> codigo)
         {
-            for (int i = 0; i < codigo.Count - 1; i++)
+            for (int i = 0; i < codigo.Count; i++)
             {
                 var actual = codigo[i];
+
+                if ((actual.Operador is "IF_TRUE" or "IF_FALSE") && TryParseNumero(actual.Argumento1, out double condicion))
+                {
+                    bool esVerdadera = condicion != 0;
+                    bool tomaSalto = actual.Operador == "IF_TRUE" ? esVerdadera : !esVerdadera;
+
+                    if (tomaSalto)
+                    {
+                        actual.Operador = "GOTO";
+                        actual.Argumento1 = string.Empty;
+                        actual.Argumento2 = string.Empty;
+                    }
+                    else
+                    {
+                        codigo.RemoveAt(i);
+                        i--;
+                    }
+
+                    LogOptimizacion.Add("[Mirilla] Se eliminó salto redundante por evaluación de condición constante.");
+                    continue;
+                }
+
+                if (i >= codigo.Count - 1)
+                    continue;
+
                 var siguiente = codigo[i + 1];
 
                 // Eliminar GOTO si salta a la etiqueta que está justo en la línea siguiente
@@ -243,10 +271,17 @@ namespace AnalizadorLexico
                             break;
 
                         // Si usa 'destino', lo cambiamos por 'origen'
-                        if (sig.Argumento1 == destino) sig.Argumento1 = origen;
-                        if (sig.Argumento2 == destino) sig.Argumento2 = origen;
+                        if (sig.Argumento1 == destino)
+                        {
+                            sig.Argumento1 = origen;
+                            LogOptimizacion.Add($"[Global] Propagación de copias: se reemplazó '{destino}' por '{origen}'.");
+                        }
+                        if (sig.Argumento2 == destino)
+                        {
+                            sig.Argumento2 = origen;
+                            LogOptimizacion.Add($"[Global] Propagación de copias: se reemplazó '{destino}' por '{origen}'.");
+                        }
                     }
-                    LogOptimizacion.Add($"[Global] Propagación de copias: {destino} = {origen} propagado a las líneas siguientes.");
                 }
             }
         }
@@ -258,77 +293,58 @@ namespace AnalizadorLexico
         {
             for (int i = 0; i < codigo.Count; i++)
             {
-                if (codigo[i].Operador != "LABEL")
-                    continue;
-
-                string etiquetaInicio = codigo[i].Resultado;
-                int posGOTO = -1;
-
-                for (int j = i + 1; j < codigo.Count; j++)
+                if (codigo[i].Operador == "LABEL")
                 {
-                    if (codigo[j].Operador == "GOTO" && codigo[j].Resultado == etiquetaInicio)
+                    string etiquetaInicio = codigo[i].Resultado;
+                    int posGOTO = -1;
+
+                    // Buscar el GOTO que cierra el ciclo (ignorando los IF)
+                    for (int j = i + 1; j < codigo.Count; j++)
                     {
-                        posGOTO = j;
-                        break;
+                        if (codigo[j].Operador == "GOTO" && codigo[j].Resultado == etiquetaInicio)
+                        {
+                            posGOTO = j;
+                            break;
+                        }
+                    }
+
+                    if (posGOTO > i)
+                    {
+                        // Buscar operaciones aritméticas dentro del bucle
+                        for (int j = i + 1; j < posGOTO; j++)
+                        {
+                            var op = codigo[j];
+                            if (EsOperadorAritmetico(op.Operador))
+                            {
+                                // Revisar si los argumentos se modifican dentro del bucle
+                                bool arg1SeModifica = false;
+                                bool arg2SeModifica = false;
+
+                                for (int k = i + 1; k < posGOTO; k++)
+                                {
+                                    if (codigo[k].Resultado == op.Argumento1) arg1SeModifica = true;
+                                    if (codigo[k].Resultado == op.Argumento2) arg2SeModifica = true;
+                                }
+
+                                // Si NINGUNO se modifica, es invariante (aunque sean variables)
+                                if (!arg1SeModifica && !arg2SeModifica)
+                                {
+                                    Cuadruplo instruccionInvariante = op;
+                                    codigo.RemoveAt(j);
+
+                                    // Insertar justo antes del LABEL de inicio
+                                    codigo.Insert(i, instruccionInvariante);
+
+                                    LogOptimizacion.Add($"[Bucles] Se sacó operación invariante del bucle {etiquetaInicio}: {instruccionInvariante.Argumento1} {instruccionInvariante.Operador} {instruccionInvariante.Argumento2} → {instruccionInvariante.Resultado}.");
+
+                                    i--;
+                                    posGOTO--;
+                                    j--;
+                                }
+                            }
+                        }
                     }
                 }
-
-                if (posGOTO == -1)
-                    continue;
-
-                HashSet<string> modificadas = codigo
-                    .Skip(i + 1)
-                    .Take(posGOTO - i - 1)
-                    .Where(c => c.Operador is not ("LABEL" or "GOTO" or "IF_TRUE" or "IF_FALSE") &&
-                                !string.IsNullOrEmpty(c.Resultado) && c.Resultado != "_")
-                    .Select(c => c.Resultado)
-                    .ToHashSet(StringComparer.Ordinal);
-
-                HashSet<string> resultadosInvariantes = new(StringComparer.Ordinal);
-                List<int> indicesInvariantes = new();
-                bool cambio;
-
-                do
-                {
-                    cambio = false;
-                    for (int j = i + 1; j < posGOTO; j++)
-                    {
-                        Cuadruplo op = codigo[j];
-                        if (!EsOperadorAritmetico(op.Operador) || indicesInvariantes.Contains(j))
-                            continue;
-
-                        bool ArgumentoEsInvariante(string argumento) =>
-                            string.IsNullOrEmpty(argumento) || argumento == "_" || EsNumero(argumento) ||
-                            !modificadas.Contains(argumento) || resultadosInvariantes.Contains(argumento);
-
-                        if (!ArgumentoEsInvariante(op.Argumento1) || !ArgumentoEsInvariante(op.Argumento2))
-                            continue;
-
-                        indicesInvariantes.Add(j);
-                        if (!string.IsNullOrEmpty(op.Resultado) && op.Resultado != "_")
-                            resultadosInvariantes.Add(op.Resultado);
-                        cambio = true;
-                    }
-                } while (cambio);
-
-                if (indicesInvariantes.Count == 0)
-                    continue;
-
-                List<Cuadruplo> invariantes = indicesInvariantes
-                    .OrderBy(indice => indice)
-                    .Select(indice => codigo[indice])
-                    .ToList();
-
-                foreach (int indice in indicesInvariantes.OrderByDescending(indice => indice))
-                    codigo.RemoveAt(indice);
-
-                codigo.InsertRange(i, invariantes);
-                foreach (Cuadruplo instruccionInvariante in invariantes)
-                {
-                    LogOptimizacion.Add($"[Bucles] Se sacó operación invariante del bucle {etiquetaInicio}: {instruccionInvariante.Argumento1} {instruccionInvariante.Operador} {instruccionInvariante.Argumento2} → {instruccionInvariante.Resultado}.");
-                }
-
-                i += invariantes.Count;
             }
         }
 

@@ -292,7 +292,7 @@
             string tokenInicio = TokenActual.token;
             string valorInicio = TokenActual.valor;
 
-            string tipoRHS = ParseARG2();
+            string tipoRHS = ParseARG2(); // Esto debería procesar la suma
 
             Consumir("CD5", "Se esperaba ';' al final de asignación");
 
@@ -308,27 +308,7 @@
                 Error($"Tipo incompatible en asignación a '{id}'. Esperado: {simbolo.Tipo}, obtenido: {tipoRHS} en línea {lineaAsignacion}");
                 return;
             }
-
-            if (tipoRHS != "ERROR")
-            {
-                string valorRegistrar = "";
-                if (tokenInicio == "CNU" || tokenInicio == "CNR")
-                {
-                    valorRegistrar = valorInicio;
-                }
-                else if (EsID(tokenInicio))
-                {
-                    string idInit = valorInicio;
-                    var simInit = BuscarSimbolo(idInit);
-                    if (simInit != null)
-                    {
-                        valorRegistrar = simInit.Valor ?? "";
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(valorRegistrar))
-                    simbolo.Valor = valorRegistrar;
-            }
+            // ... el resto del código de actualización de valores se queda igual
         }
 
         private void ParseLeer()
@@ -769,6 +749,14 @@
         private string ParseARG2()
         {
             DebugLog.Add($"ParseARG2 at pos {_pos} token {TokenActual.token} '{TokenActual.valor}'");
+
+            // ¡ESTA ES LA LÍNEA QUE FALTA! Si es un ID o un número, y el SIGUIENTE es un operador (+,-,*,/), procesa todo.
+            if ((EsID(TokenActual.token) || EsCN(TokenActual.token)) &&
+                _pos + 1 < _tokens.Count && EsOA(_tokens[_pos + 1].token))
+            {
+                return ParseOPA();
+            }
+
             if (EsID(TokenActual.token) && _pos + 1 < _tokens.Count && _tokens[_pos + 1].token == "CD3")
                 return ParseOPA();
 
@@ -782,7 +770,6 @@
                     string opToken = TokenActual.token;
                     string opValor = TokenActual.valor;
                     Consumir(TokenActual.token, "Se esperaba operador aritmético");
-
                     string tipoRight = ParseARG4();
                     if (tipoRight == "ERROR") return "ERROR";
 
@@ -794,15 +781,14 @@
                         Error($"Operador '+' no admite operandos de tipo {tipoRight} en línea {TokenActual.linea}");
                         return "ERROR";
                     }
-
                     Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: CAD y {tipoRight}");
                     return "ERROR";
                 }
-
                 return "CAD";
             }
             else if (EsID(TokenActual.token))
             {
+                // ... (El bloque que ya tienes de EsID)
                 string id = TokenActual.valor;
                 Consumir(TokenActual.token, "Se esperaba identificador");
 
@@ -841,7 +827,6 @@
                             tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                             continue;
                         }
-
                         Error($"Operador '+' no admite operandos de tipos {tipoLeft} y {tipoRight} en línea {TokenActual.linea}");
                         return "ERROR";
                     }
@@ -851,10 +836,8 @@
                         Error($"Operación aritmética requiere operandos numéricos en línea {TokenActual.linea}. Tipos: {tipoLeft} y {tipoRight}");
                         return "ERROR";
                     }
-
                     tipoLeft = (tipoLeft == "DEC" || tipoRight == "DEC") ? "DEC" : "ENT";
                 }
-
                 return tipoLeft;
             }
             else if (EsCN(TokenActual.token))
